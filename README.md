@@ -339,6 +339,63 @@ NODE_OPTIONS=--conditions=react-server npx tsx scripts/verify-transactional.ts
 Cobre 14 verificações: concorrência da última unidade, idempotência simultânea,
 webhook recebido 10x, pagamento aprovado após cancelamento e expiração idempotente.
 
+## Configuração do PostgreSQL com Supabase
+
+Este projeto usa o **Supabase apenas como PostgreSQL gerenciado**, através do
+Prisma. **Não** usamos a Supabase Data API (`supabase-js`) nem RLS: o fluxo
+continua `Frontend → Next.js → Services/DAL → Prisma → PostgreSQL`. O schema
+Prisma (`prisma/schema.prisma`) é a fonte da verdade da estrutura do banco.
+
+### 1. Criar o projeto
+1. Crie um projeto em <https://supabase.com>.
+2. Guarde a senha do banco definida na criação (não vai para o Git).
+
+### 2. Onde encontrar as connection strings
+Painel do projeto → **Project Settings → Database → Connection string**:
+- **Direct connection** — `db.<ref>.supabase.co:5432`
+- **Session Pooler** — `aws-0-<região>.pooler.supabase.com:5432`
+- **Transaction Pooler** — `...pooler.supabase.com:6543`
+
+### 3. `DATABASE_URL` vs `DIRECT_URL`
+- `DATABASE_URL` → usada pela **aplicação** em runtime (driver `pg`).
+- `DIRECT_URL` → usada pelo **Prisma CLI** (migrations). Se ausente, o CLI usa
+  `DATABASE_URL`.
+
+No **Hostinger** (Node como processo persistente), prefira o **Session Pooler
+(5432)** ou a conexão **direta** para a aplicação. Se usar o **Transaction
+Pooler (6543)**, inclua `?pgbouncer=true&connection_limit=1` e defina
+`DATABASE_POOL_MAX=1`. Mantenha sempre `sslmode=require`.
+
+> **IPv6:** a conexão **direta** (`db.<ref>.supabase.co`) é **IPv6-only**.
+> Ambientes sem IPv6 — comum no Hostinger — devem usar o **pooler**
+> (`...pooler.supabase.com`, que é IPv4) tanto para `DATABASE_URL` quanto para
+> `DIRECT_URL`.
+
+### 4. Variáveis necessárias
+Obrigatórias: `DATABASE_URL`, `AUTH_SECRET`.
+Recomendadas: `DIRECT_URL`, `AUTH_URL`, `NEXT_PUBLIC_SITE_URL`,
+`NEXT_PUBLIC_SITE_NAME`, `CRON_SECRET`, `PAYMENT_PROVIDER`,
+`SHIPPING_PROVIDER`. Nunca comite o `.env` (já está no `.gitignore`).
+
+### 5. Migrations
+```bash
+npm run db:status     # verifica o estado das migrations
+npm run db:deploy     # aplica as migrations (Supabase/produção)
+npm run db:migrate    # cria novas migrations (desenvolvimento)
+```
+Nunca use `prisma migrate reset` no Supabase.
+
+### 6. Gerar o Prisma Client
+```bash
+npm run db:generate
+```
+
+### 7. Hostinger
+Defina as mesmas variáveis em **hPanel → Node.js → Environment Variables** e
+rode `npm install` (o `postinstall` gera o Prisma Client) + `npm run build`.
+Aplique as migrations apontando para o Supabase com `npm run db:deploy`
+(localmente ou em um passo de deploy).
+
 ## Expiração automática de reservas (cron)
 
 Endpoint interno protegido que executa a expiração idempotente de reservas
