@@ -16,12 +16,10 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { parseDecimalInput } from "@/lib/format";
 import { createProductAction } from "@/modules/admin/admin.actions";
 import { buildVariantMatrix } from "@/modules/products/variant";
-import type {
-  AttributeDTO,
-  ProductTypeDTO,
-} from "@/modules/products/types";
+import type { AttributeDTO, ProductTypeDTO } from "@/modules/products/types";
 import type { CategoryLike } from "@/modules/categories/tree";
 
 interface GeneratedVariant {
@@ -29,6 +27,10 @@ interface GeneratedVariant {
   sku: string;
   price: string;
   stock: string;
+  weight: string;
+  width: string;
+  height: string;
+  length: string;
 }
 
 const STATUS_OPTIONS = [
@@ -69,9 +71,7 @@ export function ProductForm({
   const [descriptionSelection, setDescriptionSelection] = useState<
     Record<string, string>
   >({});
-  const [variantSelection, setVariantSelection] = useState<
-    Record<string, string[]>
-  >({});
+  const [variantSelection, setVariantSelection] = useState<Record<string, string[]>>({});
   const [variants, setVariants] = useState<GeneratedVariant[]>([]);
 
   const productType = useMemo(
@@ -80,7 +80,8 @@ export function ProductForm({
   );
 
   const variantAttributes = useMemo<AttributeDTO[]>(
-    () => productType?.attributes.filter((attribute) => attribute.isVariantDefining) ?? [],
+    () =>
+      productType?.attributes.filter((attribute) => attribute.isVariantDefining) ?? [],
     [productType],
   );
   const descriptiveAttributes = useMemo<AttributeDTO[]>(
@@ -134,6 +135,10 @@ export function ProductForm({
       sku: `${base}-${valueIds.slice(-2).join("-")}`.toUpperCase(),
       price: basePrice || "0",
       stock: "0",
+      weight: "",
+      width: "",
+      height: "",
+      length: "",
     }));
 
     setVariants(generated);
@@ -173,12 +178,14 @@ export function ProductForm({
         productTypeId,
         categoryId: categoryId === "none" ? null : categoryId,
         brandId: null,
-        basePrice: Number(basePrice) || 0,
-        compareAtPrice: compareAtPrice ? Number(compareAtPrice) : null,
+        basePrice: parseDecimalInput(basePrice) ?? 0,
+        compareAtPrice: parseDecimalInput(compareAtPrice),
         currency: "BRL",
         isFeatured: false,
         metadata: null,
-        images: [{ url: image, alt: name, position: 0, isPrimary: true, variantSku: null }],
+        images: [
+          { url: image, alt: name, position: 0, isPrimary: true, variantSku: null },
+        ],
         assignments: Object.entries(descriptionSelection).map(
           ([attributeId, attributeValueId]) => ({
             attributeId,
@@ -189,9 +196,12 @@ export function ProductForm({
         variants: variants.map((variant, index) => ({
           sku: variant.sku,
           name: null,
-          price: Number(variant.price) || 0,
+          price: parseDecimalInput(variant.price) ?? 0,
           compareAtPrice: null,
-          weight: null,
+          weight: parseDecimalInput(variant.weight),
+          width: parseDecimalInput(variant.width),
+          height: parseDecimalInput(variant.height),
+          length: parseDecimalInput(variant.length),
           barcode: null,
           position: index,
           isActive: true,
@@ -301,7 +311,8 @@ export function ProductForm({
             <Label htmlFor="basePrice">Preço base (R$)</Label>
             <Input
               id="basePrice"
-              type="number"
+              type="text"
+              inputMode="decimal"
               step="0.01"
               value={basePrice}
               onChange={(event) => setBasePrice(event.target.value)}
@@ -312,7 +323,8 @@ export function ProductForm({
             <Label htmlFor="compareAtPrice">Preço comparativo (R$)</Label>
             <Input
               id="compareAtPrice"
-              type="number"
+              type="text"
+              inputMode="decimal"
               step="0.01"
               value={compareAtPrice}
               onChange={(event) => setCompareAtPrice(event.target.value)}
@@ -433,41 +445,103 @@ export function ProductForm({
               {variants.map((variant, index) => (
                 <div
                   key={variant.attributeValueIds.join("-")}
-                  className="grid gap-3 sm:grid-cols-[1fr_120px_120px]"
+                  className="space-y-3 rounded-md border p-3"
                 >
-                  <div className="space-y-2">
-                    <Label className="text-xs">Combinação</Label>
-                    <Input
-                      value={variant.attributeValueIds
-                        .map(
-                          (id) =>
-                            productType?.attributes
-                              .flatMap((attribute) => attribute.values)
-                              .find((value) => value.id === id)?.value ?? id,
-                        )
-                        .join(" / ")}
-                      readOnly
-                      className="text-muted-foreground"
-                    />
+                  <div className="grid gap-3 sm:grid-cols-[1fr_120px_120px]">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Combinação</Label>
+                      <Input
+                        value={variant.attributeValueIds
+                          .map(
+                            (id) =>
+                              productType?.attributes
+                                .flatMap((attribute) => attribute.values)
+                                .find((value) => value.id === id)?.value ?? id,
+                          )
+                          .join(" / ")}
+                        readOnly
+                        className="text-muted-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">SKU</Label>
+                      <Input
+                        value={variant.sku}
+                        onChange={(event) =>
+                          updateVariant(index, { sku: event.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Estoque</Label>
+                      <Input
+                        type="number"
+                        value={variant.stock}
+                        onChange={(event) =>
+                          updateVariant(index, { stock: event.target.value })
+                        }
+                      />
+                    </div>
                   </div>
+
                   <div className="space-y-2">
-                    <Label className="text-xs">SKU</Label>
-                    <Input
-                      value={variant.sku}
-                      onChange={(event) =>
-                        updateVariant(index, { sku: event.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Estoque</Label>
-                    <Input
-                      type="number"
-                      value={variant.stock}
-                      onChange={(event) =>
-                        updateVariant(index, { stock: event.target.value })
-                      }
-                    />
+                    <p className="text-muted-foreground text-xs font-medium">
+                      Dados para envio
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Peso (kg)</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.001"
+                          value={variant.weight}
+                          onChange={(event) =>
+                            updateVariant(index, { weight: event.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Largura (cm)</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          value={variant.width}
+                          onChange={(event) =>
+                            updateVariant(index, { width: event.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Altura (cm)</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          value={variant.height}
+                          onChange={(event) =>
+                            updateVariant(index, { height: event.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Comprimento (cm)</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          value={variant.length}
+                          onChange={(event) =>
+                            updateVariant(index, { length: event.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}

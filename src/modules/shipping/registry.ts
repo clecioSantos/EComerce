@@ -1,5 +1,6 @@
 import { getEnv } from "@/lib/env";
 
+import { createMelhorEnvioProvider } from "./melhor-envio/provider";
 import { FixedShippingProvider } from "./providers/fixed.provider";
 import { PickupShippingProvider } from "./providers/pickup.provider";
 import type { ShippingProvider, ShippingQuoteInput, ShippingOption } from "./types";
@@ -29,7 +30,7 @@ export async function quoteShipping(
   return provider.quote(input);
 }
 
-// Providers disponíveis. Adicione Correios/Melhor Envio aqui no futuro.
+// Providers disponíveis. O provider ativo é escolhido por SHIPPING_PROVIDER.
 registerShippingProvider(
   new FixedShippingProvider({
     price: 19.9,
@@ -39,3 +40,4 @@ registerShippingProvider(
   }),
 );
 registerShippingProvider(new PickupShippingProvider());
+registerShippingProvider(createMelhorEnvioProvider());

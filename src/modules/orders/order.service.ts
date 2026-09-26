@@ -52,7 +52,16 @@ export interface CreateOrderInput {
     grandTotal: number;
     currency: string;
   };
-  shipping: { provider: string; method: string };
+  shipping: {
+    provider: string;
+    method: string;
+    serviceId?: string | null;
+    company?: string | null;
+    estimatedDaysMin?: number | null;
+    estimatedDaysMax?: number | null;
+    /** Snapshot serializável da opção selecionada. */
+    snapshot?: unknown;
+  };
   coupon?: { id: string; code: string } | null;
   cartId?: string | null;
   notes?: string | null;
@@ -60,12 +69,7 @@ export interface CreateOrderInput {
   requestHash?: string | null;
 }
 
-const PAID_LIKE_STATUSES: OrderStatus[] = [
-  "PAID",
-  "PROCESSING",
-  "SHIPPED",
-  "DELIVERED",
-];
+const PAID_LIKE_STATUSES: OrderStatus[] = ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"];
 
 /**
  * Cria o pedido com snapshot dos produtos, reserva estoque atomicamente
@@ -104,6 +108,12 @@ export async function createOrder(input: CreateOrderInput) {
             undefined) as unknown as Prisma.InputJsonValue,
           shippingProvider: input.shipping.provider,
           shippingMethod: input.shipping.method,
+          shippingServiceId: input.shipping.serviceId ?? null,
+          shippingCompany: input.shipping.company ?? null,
+          shippingEstimatedDaysMin: input.shipping.estimatedDaysMin ?? null,
+          shippingEstimatedDaysMax: input.shipping.estimatedDaysMax ?? null,
+          shippingSnapshot: (input.shipping.snapshot ??
+            undefined) as unknown as Prisma.InputJsonValue,
           notes: input.notes ?? null,
           items: {
             create: input.lines.map((line) => ({
@@ -182,9 +192,7 @@ export async function createOrder(input: CreateOrderInput) {
           input.requestHash &&
           existing.requestHash !== input.requestHash
         ) {
-          throw new Error(
-            "Idempotency-Key reutilizada com um payload diferente.",
-          );
+          throw new Error("Idempotency-Key reutilizada com um payload diferente.");
         }
         return existing;
       }
@@ -210,12 +218,7 @@ export async function consumeOrderReservations(
 
   const reservations = await listActiveReservationsForOrder(tx, orderId);
   for (const reservation of reservations) {
-    await consumeStock(
-      reservation.variantId,
-      reservation.quantity,
-      order.id,
-      tx,
-    );
+    await consumeStock(reservation.variantId, reservation.quantity, order.id, tx);
     await markReservationConsumed(tx, reservation.id);
   }
 
@@ -264,12 +267,7 @@ export async function cancelOrder(orderId: string) {
     if (!wasPaidLike) {
       const reservations = await listActiveReservationsForOrder(tx, order.id);
       for (const reservation of reservations) {
-        await releaseStock(
-          reservation.variantId,
-          reservation.quantity,
-          order.id,
-          tx,
-        );
+        await releaseStock(reservation.variantId, reservation.quantity, order.id, tx);
         await markReservationReleased(tx, reservation.id);
       }
       logEvent("STOCK_RELEASED", {
@@ -308,9 +306,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   if (status === "CANCELED") return cancelOrder(orderId);
   if (status === "PAID") return confirmOrderPayment(orderId);
   if (status === "REFUNDED") {
-    throw new Error(
-      "Reembolso deve ser realizado pelo fluxo de refund (refundOrder).",
-    );
+    throw new Error("Reembolso deve ser realizado pelo fluxo de refund (refundOrder).");
   }
   assertOrderTransition(order.status, status);
   return prisma.order.update({ where: { id: orderId }, data: { status } });

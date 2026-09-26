@@ -169,11 +169,7 @@ function discountAmountDecimal(
 }
 
 /** Calcula o desconto monetário de uma regra sobre uma base. */
-export function discountAmount(
-  type: DiscountType,
-  value: number,
-  base: number,
-): number {
+export function discountAmount(type: DiscountType, value: number, base: number): number {
   return discountAmountDecimal(type, value, dec(base)).toNumber();
 }
 
@@ -223,9 +219,7 @@ export function calculatePricing(input: PricingInput): PricingResult {
   let freeShipping = false;
   let stackAllowed = true;
 
-  const orderedPromotions = [...promotions].sort(
-    (a, b) => b.priority - a.priority,
-  );
+  const orderedPromotions = [...promotions].sort((a, b) => b.priority - a.priority);
 
   for (const rule of orderedPromotions) {
     if (!stackAllowed) break;
@@ -251,10 +245,7 @@ export function calculatePricing(input: PricingInput): PricingResult {
     const distribution = distributeDiscount(target, amount.toNumber());
     for (const line of target) {
       const current = lineDiscounts.get(line.id) ?? new Decimal(0);
-      lineDiscounts.set(
-        line.id,
-        current.plus(distribution.get(line.id) ?? 0),
-      );
+      lineDiscounts.set(line.id, current.plus(distribution.get(line.id) ?? 0));
       lineApplied.set(line.id, [...(lineApplied.get(line.id) ?? []), rule.id]);
     }
 
@@ -268,16 +259,22 @@ export function calculatePricing(input: PricingInput): PricingResult {
   if (coupon) {
     const couponBaseDec = subtotalDec.minus(promotionsDiscountDec);
     if (coupon.minSubtotal == null || subtotal >= coupon.minSubtotal) {
-      couponDiscountDec = discountAmountDecimal(coupon.type, coupon.value, couponBaseDec);
+      if (coupon.type === "FREE_SHIPPING") {
+        // Cupom de frete grátis: não desconta produtos, mas zera o frete.
+        freeShipping = true;
+      } else {
+        couponDiscountDec = discountAmountDecimal(
+          coupon.type,
+          coupon.value,
+          couponBaseDec,
+        );
+      }
     }
     if (couponDiscountDec.gt(0)) {
       const distribution = distributeDiscount(lines, couponDiscountDec.toNumber());
       for (const line of lines) {
         const current = lineDiscounts.get(line.id) ?? new Decimal(0);
-        lineDiscounts.set(
-          line.id,
-          current.plus(distribution.get(line.id) ?? 0),
-        );
+        lineDiscounts.set(line.id, current.plus(distribution.get(line.id) ?? 0));
         lineApplied.set(line.id, [
           ...(lineApplied.get(line.id) ?? []),
           `coupon:${coupon.code}`,
@@ -300,7 +297,9 @@ export function calculatePricing(input: PricingInput): PricingResult {
       id: line.id,
       subtotal: moneyDecimal(lineTotalDec).toNumber(),
       discount: moneyDecimal(discount).toNumber(),
-      total: moneyDecimal(Decimal.max(new Decimal(0), lineTotalDec.minus(discount))).toNumber(),
+      total: moneyDecimal(
+        Decimal.max(new Decimal(0), lineTotalDec.minus(discount)),
+      ).toNumber(),
       appliedDiscountIds: lineApplied.get(line.id) ?? [],
     };
   });

@@ -1,7 +1,4 @@
-import type {
-  AttributeType,
-  ProductStatus,
-} from "@/generated/prisma/enums";
+import type { AttributeType, ProductStatus } from "@/generated/prisma/enums";
 
 export interface AttributeValueDTO {
   id: string;
@@ -62,6 +59,9 @@ export interface VariantDTO {
   price: number;
   compareAtPrice: number | null;
   weight: number | null;
+  width: number | null;
+  height: number | null;
+  length: number | null;
   isActive: boolean;
   position: number;
   attributes: VariantAttributeDTO[];

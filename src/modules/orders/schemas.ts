@@ -2,13 +2,15 @@ import "server-only";
 
 import { z } from "zod";
 
+import { cepSchema } from "@/modules/shipping/schemas";
+
 export const shippingAddressSchema = z.object({
   recipient: z.string().min(2).max(120),
   line1: z.string().min(3).max(160),
   line2: z.string().max(160).optional().nullable(),
   city: z.string().min(2).max(80),
   state: z.string().min(2).max(80),
-  postalCode: z.string().min(4).max(12),
+  postalCode: cepSchema,
   country: z.string().min(2).max(3).default("BR"),
   phone: z.string().max(30).optional().nullable(),
 });

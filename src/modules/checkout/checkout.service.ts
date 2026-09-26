@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db/prisma";
+import { logger } from "@/lib/logger";
 import type { CartDTO } from "@/modules/cart/types";
 import { getActiveCart, mapCart } from "@/modules/cart/cart.service";
 import { confirmOrderPayment, createOrder } from "@/modules/orders/order.service";
@@ -20,8 +21,12 @@ import {
   toCouponRule,
   validateCouponForCart,
 } from "@/modules/promotions/promotion.service";
-import { quoteShipping } from "@/modules/shipping/registry";
-import type { ShippingOption } from "@/modules/shipping/types";
+import {
+  quoteShippingForItems,
+  buildShippingItems,
+} from "@/modules/shipping/quote.service";
+import { friendlyShippingMessage } from "@/modules/shipping/errors";
+import type { ShippingItem, ShippingOption } from "@/modules/shipping/types";
 
 import { computeRequestHash } from "./idempotency";
 
@@ -29,6 +34,7 @@ export interface CheckoutContext {
   cartId: string;
   cart: CartDTO;
   lines: PricingLineInput[];
+  shippingItems: ShippingItem[];
   promotions: PromotionRule[];
 }
 
@@ -36,9 +42,10 @@ async function loadContext(userId?: string | null): Promise<CheckoutContext | nu
   const rawCart = await getActiveCart(userId);
   if (!rawCart || rawCart.items.length === 0) return null;
 
-  // O include do carrinho já traz o produto (basePrice/categoryId), evitando
-  // uma segunda query de produtos.
+  // O include do carrinho já traz o produto (basePrice/categoryId) e a variante
+  // (dados logísticos), evitando queries extras.
   const cart = mapCart(rawCart);
+  const shippingItems = buildShippingItems(rawCart.items);
 
   const lines: PricingLineInput[] = rawCart.items.map((item) => {
     const unitPrice =
@@ -56,7 +63,7 @@ async function loadContext(userId?: string | null): Promise<CheckoutContext | nu
 
   const promotions = await getActivePromotionRules();
 
-  return { cartId: rawCart.id, cart, lines, promotions };
+  return { cartId: rawCart.id, cart, lines, shippingItems, promotions };
 }
 
 export interface CheckoutSummary {
@@ -64,15 +71,23 @@ export interface CheckoutSummary {
   pricing: PricingResult;
   shippingOptions: ShippingOption[];
   selectedShipping: ShippingOption | null;
+  /** Mensagem amigável quando a cotação de frete falha (a página não quebra). */
+  shippingError: string | null;
   coupon: { code: string; rule: CouponRule } | null;
 }
 
 async function buildSummary(
   context: CheckoutContext,
   userId: string | null | undefined,
-  options: { couponCode?: string | null; shippingOptionId?: string | null } = {},
+  options: {
+    couponCode?: string | null;
+    shippingOptionId?: string | null;
+    destinationPostalCode?: string | null;
+    /** Na página de resumo, falhas de frete não interrompem a renderização. */
+    tolerateShippingError?: boolean;
+  } = {},
 ): Promise<CheckoutSummary> {
-  const { cart, lines, promotions } = context;
+  const { cart, lines, promotions, shippingItems } = context;
 
   let coupon: { code: string; rule: CouponRule } | null = null;
   if (options.couponCode) {
@@ -96,18 +111,27 @@ async function buildSummary(
     shippingCost: 0,
   });
 
-  const shippingOptions = await quoteShipping({
-    items: cart.items.map((item) => ({
-      variantId: item.variantId,
-      quantity: item.quantity,
-    })),
-    subtotal: basePricing.subtotal,
-  });
+  let shippingOptions: ShippingOption[] = [];
+  let shippingError: string | null = null;
+  try {
+    shippingOptions = await quoteShippingForItems({
+      items: shippingItems,
+      subtotal: basePricing.subtotal,
+      destinationPostalCode: options.destinationPostalCode ?? null,
+    });
+  } catch (error) {
+    if (!options.tolerateShippingError) throw error;
+    shippingError = friendlyShippingMessage(error);
+    logger.error({
+      event: "CHECKOUT_SHIPPING_QUOTE_FAILED",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
+  // Não seleciona automaticamente: o cliente precisa escolher explicitamente
+  // uma opção antes de finalizar.
   const selectedShipping =
-    shippingOptions.find((option) => option.id === options.shippingOptionId) ??
-    shippingOptions[0] ??
-    null;
+    shippingOptions.find((option) => option.id === options.shippingOptionId) ?? null;
 
   const pricing = calculatePricing({
     lines,
@@ -116,16 +140,27 @@ async function buildSummary(
     shippingCost: selectedShipping?.price ?? 0,
   });
 
-  return { cart, pricing, shippingOptions, selectedShipping, coupon };
+  return {
+    cart,
+    pricing,
+    shippingOptions,
+    selectedShipping,
+    shippingError,
+    coupon,
+  };
 }
 
 export async function getCheckoutSummary(
   userId: string | null | undefined,
-  options: { couponCode?: string | null; shippingOptionId?: string | null } = {},
+  options: {
+    couponCode?: string | null;
+    shippingOptionId?: string | null;
+    destinationPostalCode?: string | null;
+  } = {},
 ): Promise<CheckoutSummary | null> {
   const context = await loadContext(userId);
   if (!context) return null;
-  return buildSummary(context, userId, options);
+  return buildSummary(context, userId, { ...options, tolerateShippingError: true });
 }
 
 export interface PlaceOrderResult {
@@ -145,8 +180,9 @@ export async function placeOrder(
   const summary = await buildSummary(context, userId, {
     couponCode: input.couponCode,
     shippingOptionId: input.shippingOptionId,
+    destinationPostalCode: input.shippingAddress.postalCode,
   });
-  if (!summary.selectedShipping) throw new Error("Opção de frete inválida.");
+  if (!summary.selectedShipping) throw new Error("Selecione uma opção de frete.");
 
   const discountById = new Map(
     summary.pricing.lines.map((line) => [line.id, line.discount]),
@@ -231,7 +267,15 @@ export async function placeOrder(
       grandTotal: summary.pricing.grandTotal,
       currency: context.cart.currency,
     },
-    shipping: { provider: selected.provider, method: selected.label },
+    shipping: {
+      provider: selected.provider,
+      method: selected.label,
+      serviceId: selected.id,
+      company: selected.companyName ?? null,
+      estimatedDaysMin: selected.estimatedDaysMin ?? null,
+      estimatedDaysMax: selected.estimatedDaysMax ?? null,
+      snapshot: selected,
+    },
     coupon: summary.coupon
       ? {
           id: await resolveCouponId(summary.coupon.code),

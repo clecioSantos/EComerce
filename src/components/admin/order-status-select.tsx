@@ -25,6 +25,10 @@ const STATUSES: { value: OrderStatus; label: string }[] = [
   { value: "EXPIRED", label: "Expirado" },
 ];
 
+const STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  STATUSES.map((item) => [item.value, item.label]),
+);
+
 export function OrderStatusSelect({
   orderId,
   status,
@@ -51,7 +55,9 @@ export function OrderStatusSelect({
   return (
     <Select value={status} onValueChange={handleChange} disabled={pending}>
       <SelectTrigger className="h-8 w-44">
-        <SelectValue />
+        <SelectValue>
+          {(value) => STATUS_LABELS[String(value)] ?? "Selecione"}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {STATUSES.map((item) => (

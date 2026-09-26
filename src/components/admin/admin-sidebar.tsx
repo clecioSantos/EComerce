@@ -5,6 +5,8 @@ import {
   LayoutDashboard,
   Menu,
   Package,
+  Percent,
+  Settings,
   Shapes,
   ShoppingCart,
   Tags,
@@ -30,6 +32,8 @@ const NAV_ITEMS = [
   { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/cupons", label: "Cupons", icon: Ticket },
+  { href: "/admin/promocoes", label: "Promoções", icon: Percent },
+  { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
@@ -39,9 +43,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
     <nav className="flex flex-col gap-1 p-3">
       {NAV_ITEMS.map((item) => {
         const active =
-          item.href === "/admin"
-            ? pathname === "/admin"
-            : pathname.startsWith(item.href);
+          item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (
           <Link
@@ -70,9 +72,7 @@ export function AdminSidebar() {
   return (
     <>
       <aside className="bg-background hidden w-64 shrink-0 border-r md:block">
-        <div className="flex h-16 items-center border-b px-5 font-semibold">
-          Painel
-        </div>
+        <div className="flex h-16 items-center border-b px-5 font-semibold">Painel</div>
         <NavList />
         <div className="p-3">
           <Button

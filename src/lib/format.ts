@@ -28,3 +28,14 @@ export function toNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
+
+/**
+ * Converte a entrada decimal digitada pelo usuário. Aceita vírgula ou ponto
+ * como separador (ex.: "0,3" e "0.3" → 0.3). Retorna null para vazio/inválido.
+ */
+export function parseDecimalInput(value: string): number | null {
+  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+  if (normalized.length === 0) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}

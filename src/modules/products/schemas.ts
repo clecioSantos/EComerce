@@ -41,10 +41,7 @@ const attributeBaseSchema = z.object({
 });
 
 export const createAttributeSchema = attributeBaseSchema.refine(
-  (data) =>
-    !data.allowMultiple ||
-    data.type === "MULTI_SELECT" ||
-    data.type === "SELECT",
+  (data) => !data.allowMultiple || data.type === "MULTI_SELECT" || data.type === "SELECT",
   {
     message: "allowMultiple só faz sentido para SELECT ou MULTI_SELECT",
     path: ["allowMultiple"],
@@ -57,9 +54,7 @@ export const createProductTypeSchema = z.object({
   description: z.string().max(300).optional().nullable(),
   icon: z.string().max(40).optional().nullable(),
   isActive: z.coerce.boolean().default(true),
-  attributes: z
-    .array(attributeBaseSchema.omit({ productTypeId: true }))
-    .default([]),
+  attributes: z.array(attributeBaseSchema.omit({ productTypeId: true })).default([]),
 });
 
 export const productAssignmentSchema = z.object({
@@ -74,7 +69,12 @@ export const productVariantInputSchema = z
     name: z.string().max(160).optional().nullable(),
     price: z.coerce.number().min(0).optional().nullable(),
     compareAtPrice: z.coerce.number().min(0).optional().nullable(),
-    weight: z.coerce.number().min(0).optional().nullable(),
+    // Dados logísticos para frete (peso em kg, dimensões em cm). Zero/negativo
+    // é rejeitado quando informado.
+    weight: z.coerce.number().positive().optional().nullable(),
+    width: z.coerce.number().positive().optional().nullable(),
+    height: z.coerce.number().positive().optional().nullable(),
+    length: z.coerce.number().positive().optional().nullable(),
     barcode: z.string().max(80).optional().nullable(),
     position: z.coerce.number().int().min(0).default(0),
     isActive: z.coerce.boolean().default(true),
@@ -106,6 +106,71 @@ export const productImageSchema = z.object({
   variantSku: z.string().optional().nullable(),
 });
 
+/** Edição dos dados logísticos de uma variante existente (frete). */
+export const variantLogisticsSchema = z.object({
+  variantId: z.string().min(1),
+  weight: z.coerce.number().positive().optional().nullable(),
+  width: z.coerce.number().positive().optional().nullable(),
+  height: z.coerce.number().positive().optional().nullable(),
+  length: z.coerce.number().positive().optional().nullable(),
+});
+
+/** Edição de uma variante existente (preços, dados de envio, SKU, status). */
+export const updateProductVariantSchema = z
+  .object({
+    id: idField,
+    sku: z.string().min(1).max(80),
+    name: z.string().max(160).optional().nullable(),
+    price: z.coerce.number().min(0).optional().nullable(),
+    compareAtPrice: z.coerce.number().min(0).optional().nullable(),
+    weight: z.coerce.number().positive().optional().nullable(),
+    width: z.coerce.number().positive().optional().nullable(),
+    height: z.coerce.number().positive().optional().nullable(),
+    length: z.coerce.number().positive().optional().nullable(),
+    barcode: z.string().max(80).optional().nullable(),
+    isActive: z.coerce.boolean().default(true),
+  })
+  .refine(
+    (data) =>
+      data.compareAtPrice == null ||
+      data.price == null ||
+      data.compareAtPrice >= data.price,
+    {
+      message: "Preço comparativo deve ser >= preço da variante",
+      path: ["compareAtPrice"],
+    },
+  );
+
+/** Edição dos dados básicos do produto + suas variantes. */
+export const updateProductSchema = z
+  .object({
+    id: idField,
+    name: z.string().min(2).max(160),
+    slug: slugField,
+    description: z.string().optional().nullable(),
+    shortDescription: z.string().max(300).optional().nullable(),
+    status: productStatusSchema.default("DRAFT"),
+    categoryId: idField.optional().nullable(),
+    brandId: idField.optional().nullable(),
+    basePrice: z.coerce.number().min(0),
+    compareAtPrice: z.coerce.number().min(0).optional().nullable(),
+    isFeatured: z.coerce.boolean().default(false),
+    primaryImageUrl: z
+      .union([z.url(), z.literal("")])
+      .optional()
+      .nullable(),
+    variants: z
+      .array(updateProductVariantSchema)
+      .min(1, "Mantenha ao menos uma variante"),
+  })
+  .refine(
+    (data) => data.compareAtPrice == null || data.compareAtPrice >= data.basePrice,
+    {
+      message: "Preço comparativo deve ser >= preço base",
+      path: ["compareAtPrice"],
+    },
+  );
+
 export const createProductSchema = z
   .object({
     name: z.string().min(2).max(160),
@@ -123,9 +188,7 @@ export const createProductSchema = z
     metadata: z.record(z.string(), z.unknown()).optional().nullable(),
     images: z.array(productImageSchema).default([]),
     assignments: z.array(productAssignmentSchema).default([]),
-    variants: z
-      .array(productVariantInputSchema)
-      .min(1, "Crie ao menos uma variante"),
+    variants: z.array(productVariantInputSchema).min(1, "Crie ao menos uma variante"),
   })
   .refine(
     (data) => data.compareAtPrice == null || data.compareAtPrice >= data.basePrice,
@@ -142,3 +205,6 @@ export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type ProductVariantInput = z.infer<typeof productVariantInputSchema>;
 export type ProductImageInput = z.infer<typeof productImageSchema>;
 export type ProductAssignmentInput = z.infer<typeof productAssignmentSchema>;
+export type VariantLogisticsInput = z.infer<typeof variantLogisticsSchema>;
+export type UpdateProductInput = z.infer<typeof updateProductSchema>;
+export type UpdateProductVariantInput = z.infer<typeof updateProductVariantSchema>;

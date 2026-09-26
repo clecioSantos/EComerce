@@ -57,9 +57,7 @@ export default async function AdminOrdersPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    render={
-                      <Link href={`/conta/pedidos/${order.id}`} target="_blank" />
-                    }
+                    render={<Link href={`/admin/pedidos/${order.id}`} />}
                   >
                     Ver
                   </Button>
@@ -68,10 +66,7 @@ export default async function AdminOrdersPage() {
             ))}
             {orders.length === 0 ? (
               <tr>
-                <td
-                  colSpan={5}
-                  className="text-muted-foreground px-4 py-8 text-center"
-                >
+                <td colSpan={5} className="text-muted-foreground px-4 py-8 text-center">
                   Nenhum pedido.
                 </td>
               </tr>

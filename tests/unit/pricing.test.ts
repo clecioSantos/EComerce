@@ -162,6 +162,34 @@ describe("pricing engine", () => {
     expect(result.couponDiscount).toBe(0);
   });
 
+  it("cupom de frete grátis zera o frete sem descontar produtos", () => {
+    const result = calculatePricing({
+      lines,
+      shippingCost: 30,
+      coupon: { code: "FRETEZERO", type: "FREE_SHIPPING", value: 0 },
+    });
+    expect(result.couponDiscount).toBe(0);
+    expect(result.freeShipping).toBe(true);
+    expect(result.shippingDiscount).toBe(30);
+    expect(result.grandTotal).toBe(250);
+  });
+
+  it("não aplica cupom de frete grátis abaixo do subtotal mínimo", () => {
+    const result = calculatePricing({
+      lines,
+      shippingCost: 30,
+      coupon: {
+        code: "FRETEZERO",
+        type: "FREE_SHIPPING",
+        value: 0,
+        minSubtotal: 1000,
+      },
+    });
+    expect(result.freeShipping).toBe(false);
+    expect(result.shippingDiscount).toBe(0);
+    expect(result.grandTotal).toBe(280);
+  });
+
   it("respeita o mínimo de subtotal e quantidade das promoções", () => {
     const result = calculatePricing({
       lines,

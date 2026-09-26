@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { cepSchema } from "@/modules/shipping/schemas";
+
 export const registerCustomerSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.email(),
@@ -24,13 +26,18 @@ export const addressSchema = z.object({
   line2: z.string().max(160).optional().nullable(),
   city: z.string().min(2).max(80),
   state: z.string().min(2).max(80),
-  postalCode: z.string().min(4).max(12),
+  postalCode: cepSchema,
   country: z.string().min(2).max(3).default("BR"),
   phone: z.string().max(30).optional().nullable(),
   isDefault: z.coerce.boolean().default(false),
+});
+
+export const updateAddressSchema = addressSchema.extend({
+  id: z.string().min(1),
 });
 
 export type RegisterCustomerInput = z.infer<typeof registerCustomerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type AddressInput = z.infer<typeof addressSchema>;
+export type UpdateAddressInput = z.infer<typeof updateAddressSchema>;

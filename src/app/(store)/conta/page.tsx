@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AddressBook } from "@/components/account/address-book";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { getCurrentUser } from "@/lib/auth/dal";
@@ -39,28 +40,8 @@ export default async function AccountPage() {
           </Button>
         </section>
 
-        <section className="space-y-3 rounded-lg border p-5">
-          <h2 className="text-sm font-semibold">Endereços</h2>
-          {addresses.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              Nenhum endereço cadastrado.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {addresses.map((address) => (
-                <li key={address.id} className="text-sm">
-                  <p className="font-medium">{address.recipient}</p>
-                  <p className="text-muted-foreground">
-                    {address.line1}
-                    {address.line2 ? `, ${address.line2}` : ""}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {address.city} - {address.state}, {address.postalCode}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
+        <section className="rounded-lg border p-5">
+          <AddressBook addresses={addresses} />
         </section>
       </div>
 

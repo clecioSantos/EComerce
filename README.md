@@ -12,19 +12,19 @@ móveis, cosméticos, acessórios...).
 
 ## Stack
 
-| Camada         | Tecnologia                                   |
-| -------------- | -------------------------------------------- |
-| Framework      | Next.js 16 (App Router, Turbopack)           |
-| Linguagem      | TypeScript (strict)                          |
-| UI             | Tailwind CSS v4 + shadcn/ui (Base UI)        |
-| Banco          | PostgreSQL                                   |
-| ORM            | Prisma 7 (`prisma-client` + driver adapter)  |
-| Autenticação   | Auth.js (NextAuth v5) — Credentials + JWT    |
-| Validação      | Zod                                          |
-| Formulários    | React Hook Form                              |
-| Qualidade      | ESLint, Prettier                             |
-| Testes         | Vitest (unidade) + Playwright (e2e)          |
-| Infra local    | Docker Compose (PostgreSQL)                  |
+| Camada       | Tecnologia                                  |
+| ------------ | ------------------------------------------- |
+| Framework    | Next.js 16 (App Router, Turbopack)          |
+| Linguagem    | TypeScript (strict)                         |
+| UI           | Tailwind CSS v4 + shadcn/ui (Base UI)       |
+| Banco        | PostgreSQL                                  |
+| ORM          | Prisma 7 (`prisma-client` + driver adapter) |
+| Autenticação | Auth.js (NextAuth v5) — Credentials + JWT   |
+| Validação    | Zod                                         |
+| Formulários  | React Hook Form                             |
+| Qualidade    | ESLint, Prettier                            |
+| Testes       | Vitest (unidade) + Playwright (e2e)         |
+| Infra local  | Docker Compose (PostgreSQL)                 |
 
 ---
 
@@ -83,7 +83,7 @@ src/
     orders/                  # máquina de estados + serviço
     customers/               # clientes + endereços + auth actions
     payments/                # PaymentProvider + registry + mock
-    shipping/                # ShippingProvider + registry + fixed/pickup
+    shipping/                # ShippingProvider + registry + fixed/pickup/melhor-envio
     reviews/
     admin/                   # server actions do painel
   components/
@@ -106,8 +106,9 @@ e2e/                         # Playwright
 provider real, crie uma classe que implemente a interface e registre em
 `src/modules/payments/registry.ts`. O `Order` nunca fala com SDKs externos.
 
-**Frete** — `ShippingProvider` (`quote`). Providers atuais: `fixed` e `pickup`.
-Registre novos em `src/modules/shipping/registry.ts`.
+**Frete** — `ShippingProvider` (`quote`). Providers atuais: `fixed`, `pickup` e
+`melhor-envio` (cálculo real via API, por produtos). Registre novos em
+`src/modules/shipping/registry.ts`.
 
 O provider ativo vem das variáveis `PAYMENT_PROVIDER` e `SHIPPING_PROVIDER`.
 
@@ -127,13 +128,21 @@ Relacional e normalizado. Principais entidades:
 - **Pagamentos**: `Payment`, `PaymentTransaction`
 - **Promoções**: `Promotion`, `Coupon`, `CouponUsage`
 - **Avaliações**: `Review`
+- **Configurações**: `StoreSettings` (singleton com endereço de origem e
+  serviços de frete habilitados)
 
 Pontos-chave:
 
 - O preço base fica em `Product`; preço/estoque/atributos ficam na **variante**.
+- A variante guarda os **dados logísticos genéricos** (`weight`, `width`,
+  `height`, `length`) usados na cotação de frete.
 - `ProductVariantAttribute` liga variante ↔ valor de atributo (genérico).
 - `ProductAttributeAssignment` guarda atributos descritivos (não-variante).
 - `OrderItem.attributesSnapshot` congela os atributos comprados.
+- `Order` guarda um **snapshot do frete** (`shippingProvider`, `shippingMethod`,
+  `shippingServiceId`, `shippingCompany`, `shippingEstimatedDaysMin/Max`,
+  `shippingSnapshot`) e o valor cobrado em `shippingTotal` — sem depender de nova
+  cotação após o pedido ser criado.
 - `Inventory` nunca está em `Product`.
 
 A migração inicial está em `prisma/migrations/0_init/migration.sql` (gerada com
@@ -204,10 +213,10 @@ Acesse <http://localhost:3000>.
 
 **Credenciais do seed**
 
-| Perfil  | E-mail                     | Senha        |
-| ------- | -------------------------- | ------------ |
-| Admin   | admin@ecommerce.local      | admin12345   |
-| Cliente | cliente@ecommerce.local    | cliente12345 |
+| Perfil  | E-mail                  | Senha        |
+| ------- | ----------------------- | ------------ |
+| Admin   | admin@ecommerce.local   | admin12345   |
+| Cliente | cliente@ecommerce.local | cliente12345 |
 
 ### 7. Qualidade e testes
 
@@ -252,6 +261,21 @@ registerPaymentProvider(new StripePaymentProvider());
 
 Nenhuma lógica de pedido precisa mudar.
 
+---
+
+## Promoções e cupons
+
+- **Admin → Promoções**: descontos **automáticos** (não exigem cupom), com tipo
+  (`PERCENTAGE`, `FIXED_AMOUNT`, `FREE_SHIPPING`), escopo (`CART`, `CATEGORY`,
+  `PRODUCT`), mínimo de subtotal/quantidade, período, prioridade e
+  acumulabilidade. É aqui que se encontra, por exemplo, a promoção de
+  **frete grátis** criada pelo seed ("Frete grátis acima de R$ 199") — desative-a
+  ou edite o mínimo para alterar a regra.
+- **Admin → Cupons**: descontos aplicados por código no checkout.
+
+Promoções são avaliadas por preços puros em `src/modules/pricing/engine.ts`; as
+regras ativas vêm de `getActivePromotionRules()`.
+
 ## Como adicionar um novo ShippingProvider
 
 1. Crie `src/modules/shipping/providers/<nome>.provider.ts` implementando
@@ -262,9 +286,114 @@ Nenhuma lógica de pedido precisa mudar.
 registerShippingProvider(new CorreiosShippingProvider());
 ```
 
-3. Aponte `SHIPPING_PROVIDER` no `.env`.
+3. Aponte `SHIPPING_PROVIDER` no `.env`. Valor `melhor-envio` habilita a
+   integração real com o Melhor Envio.
 
 ---
+
+## Cálculo de frete (Melhor Envio)
+
+A cotação é server-side: `Frontend → POST /api/shipping/quote → ShippingService
+→ Melhor Envio`. O token **nunca** vai ao navegador e o frontend **nunca** chama
+a API do Melhor Envio diretamente.
+
+### Como funciona
+
+1. No checkout, o cliente informa o CEP de entrega e clica em **Calcular frete**.
+2. O frontend chama `POST /api/shipping/quote` enviando **apenas** o CEP.
+3. O backend carrega o carrinho no banco, o endereço de origem da loja e os
+   dados logísticos (peso/dimensões) de cada variante. Peso, dimensões, preço e
+   quantidade **nunca** são confiados ao cliente.
+4. O backend monta a requisição por **produtos** (`/api/v2/me/shipment/calculate`)
+   e normaliza a resposta para um DTO interno (`ShippingOption`).
+5. O cliente escolhe uma opção; ao finalizar, o servidor **recota e valida** a
+   opção escolhida pelo id antes de gravar o pedido (o preço vem sempre do
+   servidor). A seleção é **obrigatória** — sem escolher uma opção não é possível
+   finalizar.
+6. A opção **Retirar na loja** (frete grátis) é sempre acrescentada às demais,
+   sem depender da cotação externa.
+
+### Variáveis de ambiente
+
+| Variável                        | Descrição                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `SHIPPING_PROVIDER`             | `melhor-envio` para ativar a integração (ou `fixed`/`pickup`).                                      |
+| `TOKEN_MELHOR_ENVIO`            | Token da API. **Somente no servidor**; nunca use `NEXT_PUBLIC_*`.                                   |
+| `MELHOR_ENVIO_API_URL`          | Base da API. Sandbox: `https://sandbox.melhorenvio.com.br`; produção: `https://melhorenvio.com.br`. |
+| `MELHOR_ENVIO_USER_AGENT`       | Nome da aplicação enviado no `User-Agent` (exigido pela API).                                       |
+| `MELHOR_ENVIO_USER_AGENT_EMAIL` | E-mail de contato técnico incluído no `User-Agent`.                                                 |
+
+Nunca comite o token real: `.env` é ignorado pelo Git; o `.env.example` fica só
+com placeholders.
+
+### Sandbox vs. produção
+
+- **Sandbox** (`https://sandbox.melhorenvio.com.br`): testes, valores simulados.
+- **Produção** (`https://melhorenvio.com.br`): valores reais de contrato.
+
+A troca é apenas a variável `MELHOR_ENVIO_API_URL`. Use tokens de cada ambiente.
+
+### Configurar o endereço de origem
+
+**Admin → Configurações**: informe CEP, logradouro, número, complemento, bairro,
+cidade e estado. O CEP de origem é obrigatório para a cotação. Nesse mesmo
+formulário, marque em uma **lista de checkboxes** os serviços de frete que a loja
+oferece (nome + transportadora, carregados do Melhor Envio em tempo real; há uma
+lista padrão de contingência se a API estiver indisponível). Sem configuração, a
+cotação responde indisponível.
+
+### Cadastrar peso e dimensões dos produtos
+
+**Admin → Produtos → Novo produto → Variantes → Dados para envio**: para cada
+variante informe **Peso (kg)**, **Largura (cm)**, **Altura (cm)** e
+**Comprimento (cm)** (valores positivos). Os dados vivem na variante, pois
+variantes do mesmo produto podem ter pesos/dimensões diferentes — o mecanismo é
+100% genérico (roupas, eletrônicos, livros, cosméticos...).
+
+Se uma variante do carrinho estiver sem esses dados, a cotação falha com
+`MISSING_LOGISTICS`: o cliente vê uma mensagem amigável e o servidor registra em
+log **quais variantes** estão incompletas (SKU + campos faltantes). **Não** são
+enviados valores fictícios. Para completar variantes já existentes, use
+**Admin → Estoque → Envio** em cada linha.
+
+### Testar a integração
+
+1. Configure o endereço de origem e os serviços em **Admin → Configurações**.
+2. Cadastre peso/dimensões das variantes (acima).
+3. Adicione produtos ao carrinho e, no checkout, informe o CEP e clique em
+   **Calcular frete**.
+4. Para testes automatizados sem rede, rode `npm test` (os testes mockam a API).
+
+### Endpoint interno
+
+```
+POST /api/shipping/quote
+Content-Type: application/json
+
+{ "postalCode": "01018-020" }
+```
+
+Resposta de sucesso: `{ ok: true, postalCode, options: ShippingOption[] }`.
+Erros seguem `{ ok: false, code, error }` com status adequado (`400`, `422`,
+`502`, `503`, `504`). O token nunca aparece nas respostas nem nos logs.
+
+Ao calcular, o servidor registra o **pacote enviado** ao Melhor Envio no log
+estruturado com o evento `SHIPPING_QUOTE_REQUEST` (CEPs, produtos, pesos,
+dimensões, valor segurado, quantidades e serviços — sem credenciais).
+
+### Endereços do cliente
+
+O cliente autenticado gerencia seus endereços em **Minha conta → Endereços**
+(`/conta`): criar, editar, excluir e definir o padrão. No checkout, um seletor
+lista os endereços salvos (o padrão vem pré-selecionado) e preenche o formulário;
+ao optar por **Novo endereço**, é possível marcar **"Salvar este endereço na minha
+conta"** para guardá-lo (não bloqueia a finalização se falhar).
+
+### Escopo desta etapa
+
+Somente **cotação**. Compra/impressão de etiqueta, pagamento do frete, rastreio,
+webhooks, cancelamento e logística reversa ficam para etapas futuras — a
+abstração (`ShippingProvider` + service + cliente isolado) já está preparada.
 
 ## Decisões arquiteturais
 
@@ -347,16 +476,20 @@ continua `Frontend → Next.js → Services/DAL → Prisma → PostgreSQL`. O sc
 Prisma (`prisma/schema.prisma`) é a fonte da verdade da estrutura do banco.
 
 ### 1. Criar o projeto
+
 1. Crie um projeto em <https://supabase.com>.
 2. Guarde a senha do banco definida na criação (não vai para o Git).
 
 ### 2. Onde encontrar as connection strings
+
 Painel do projeto → **Project Settings → Database → Connection string**:
+
 - **Direct connection** — `db.<ref>.supabase.co:5432`
 - **Session Pooler** — `aws-0-<região>.pooler.supabase.com:5432`
 - **Transaction Pooler** — `...pooler.supabase.com:6543`
 
 ### 3. `DATABASE_URL` vs `DIRECT_URL`
+
 - `DATABASE_URL` → usada pela **aplicação** em runtime (driver `pg`).
 - `DIRECT_URL` → usada pelo **Prisma CLI** (migrations). Se ausente, o CLI usa
   `DATABASE_URL`.
@@ -372,25 +505,30 @@ Pooler (6543)**, inclua `?pgbouncer=true&connection_limit=1` e defina
 > `DIRECT_URL`.
 
 ### 4. Variáveis necessárias
+
 Obrigatórias: `DATABASE_URL`, `AUTH_SECRET`.
 Recomendadas: `DIRECT_URL`, `AUTH_URL`, `NEXT_PUBLIC_SITE_URL`,
 `NEXT_PUBLIC_SITE_NAME`, `CRON_SECRET`, `PAYMENT_PROVIDER`,
 `SHIPPING_PROVIDER`. Nunca comite o `.env` (já está no `.gitignore`).
 
 ### 5. Migrations
+
 ```bash
 npm run db:status     # verifica o estado das migrations
 npm run db:deploy     # aplica as migrations (Supabase/produção)
 npm run db:migrate    # cria novas migrations (desenvolvimento)
 ```
+
 Nunca use `prisma migrate reset` no Supabase.
 
 ### 6. Gerar o Prisma Client
+
 ```bash
 npm run db:generate
 ```
 
 ### 7. Hostinger
+
 Defina as mesmas variáveis em **hPanel → Node.js → Environment Variables** e
 rode `npm install` (o `postinstall` gera o Prisma Client) + `npm run build`.
 Aplique as migrations apontando para o Supabase com `npm run db:deploy`
@@ -427,8 +565,9 @@ Invoke-RestMethod -Method Post -Uri https://SEU_HOST/api/internal/expire-reserva
 
 ## Próximos passos
 
-- Providers reais de pagamento (Mercado Pago, Stripe, PagBank) e de frete
-  (Correios, Melhor Envio).
+- Providers reais de pagamento (Mercado Pago, Stripe, PagBank).
+- Melhor Envio: compra/impressão de etiqueta, rastreio, cancelamento e webhooks
+  (a cotação já está implementada).
 - Upload de imagens (S3/Cloudinary) no lugar de URLs.
 - Cupons de frete grátis e descontos por quantidade no motor de preços.
 - Busca full-text e facetas com contagem.

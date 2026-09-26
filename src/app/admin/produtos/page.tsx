@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ProductDeleteButton } from "@/components/admin/product-delete-button";
 import { ProductStatusSelect } from "@/components/admin/product-status-select";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
@@ -30,9 +31,7 @@ export default async function AdminProductsPage() {
             {items.length} produto(s) cadastrado(s).
           </p>
         </div>
-        <Button render={<Link href="/admin/produtos/novo" />}>
-          Novo produto
-        </Button>
+        <Button render={<Link href="/admin/produtos/novo" />}>Novo produto</Button>
       </div>
 
       <div className="bg-background overflow-x-auto rounded-lg border">
@@ -43,7 +42,7 @@ export default async function AdminProductsPage() {
               <th className="px-4 py-3 font-medium">Tipo</th>
               <th className="px-4 py-3 font-medium">Preço</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium" />
+              <th className="px-4 py-3 font-medium">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -62,19 +61,29 @@ export default async function AdminProductsPage() {
                   {formatCurrency(product.basePrice, product.currency)}
                 </td>
                 <td className="px-4 py-3">
-                  <ProductStatusSelect
-                    productId={product.id}
-                    status={product.status}
-                  />
+                  <ProductStatusSelect productId={product.id} status={product.status} />
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    render={<Link href={`/produtos/${product.slug}`} target="_blank" />}
-                  >
-                    Ver
-                  </Button>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      render={<Link href={`/admin/produtos/${product.id}/editar`} />}
+                    >
+                      Editar
+                    </Button>
+                    <ProductDeleteButton
+                      productId={product.id}
+                      productName={product.name}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      render={<Link href={`/produtos/${product.slug}`} target="_blank" />}
+                    >
+                      Ver
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -1,4 +1,5 @@
 import { InventoryAdjust } from "@/components/admin/inventory-adjust";
+import { VariantLogisticsForm } from "@/components/admin/variant-logistics-form";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/db/prisma";
 
@@ -32,6 +33,7 @@ export default async function AdminInventoryPage() {
               <th className="px-4 py-3 font-medium">Físico</th>
               <th className="px-4 py-3 font-medium">Reservado</th>
               <th className="px-4 py-3 font-medium">Disponível</th>
+              <th className="px-4 py-3 font-medium">Envio</th>
               <th className="px-4 py-3 font-medium">Ajustar</th>
             </tr>
           </thead>
@@ -41,9 +43,7 @@ export default async function AdminInventoryPage() {
               return (
                 <tr key={item.id}>
                   <td className="px-4 py-3">{item.variant.product.name}</td>
-                  <td className="text-muted-foreground px-4 py-3">
-                    {item.variant.sku}
-                  </td>
+                  <td className="text-muted-foreground px-4 py-3">{item.variant.sku}</td>
                   <td className="px-4 py-3">{item.quantityOnHand}</td>
                   <td className="px-4 py-3">{item.quantityReserved}</td>
                   <td className="px-4 py-3">
@@ -54,6 +54,24 @@ export default async function AdminInventoryPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
+                    <VariantLogisticsForm
+                      variantId={item.variantId}
+                      sku={item.variant.sku}
+                      weight={
+                        item.variant.weight == null ? null : Number(item.variant.weight)
+                      }
+                      width={
+                        item.variant.width == null ? null : Number(item.variant.width)
+                      }
+                      height={
+                        item.variant.height == null ? null : Number(item.variant.height)
+                      }
+                      length={
+                        item.variant.length == null ? null : Number(item.variant.length)
+                      }
+                    />
+                  </td>
+                  <td className="px-4 py-3">
                     <InventoryAdjust variantId={item.variantId} />
                   </td>
                 </tr>
@@ -61,10 +79,7 @@ export default async function AdminInventoryPage() {
             })}
             {items.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="text-muted-foreground px-4 py-8 text-center"
-                >
+                <td colSpan={7} className="text-muted-foreground px-4 py-8 text-center">
                   Nenhum item em estoque.
                 </td>
               </tr>

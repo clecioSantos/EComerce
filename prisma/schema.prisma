@@ -307,7 +307,13 @@ model ProductVariant {
   name           String?
   price          Decimal? @db.Decimal(12, 2)
   compareAtPrice Decimal? @db.Decimal(12, 2)
+  // Dados logísticos genéricos (necessários para cotação de frete). Peso em kg,
+  // dimensões em cm. Ficam na variante porque variantes do mesmo produto podem
+  // ter pesos/dimensões diferentes.
   weight         Decimal? @db.Decimal(10, 3)
+  width          Decimal? @db.Decimal(10, 2)
+  height         Decimal? @db.Decimal(10, 2)
+  length         Decimal? @db.Decimal(10, 2)
   barcode        String?
   position       Int      @default(0)
   isActive       Boolean  @default(true)
@@ -521,6 +527,11 @@ model Order {
   billingAddress    Json?
   shippingProvider  String?
   shippingMethod    String?
+  shippingServiceId String?
+  shippingCompany   String?
+  shippingEstimatedDaysMin Int?
+  shippingEstimatedDaysMax Int?
+  shippingSnapshot  Json?
   trackingCode      String?
   notes             String?
   metadata          Json?
@@ -745,4 +756,28 @@ model Review {
   @@index([productId])
   @@index([status])
   @@map("reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Configurações da loja (singleton)
+// ---------------------------------------------------------------------------
+
+// Endereço de origem dos envios + serviços de frete habilitados. O CEP de
+// origem é o dado essencial para a cotação; o restante fica para emissão de
+// etiquetas/documentos em etapas futuras.
+model StoreSettings {
+  id                 String   @id @default("default")
+  postalCode         String
+  street             String
+  number             String
+  complement         String?
+  district           String
+  city               String
+  state              String
+  // IDs dos serviços do Melhor Envio habilitados (ex.: ["1", "2"]).
+  shippingServiceIds String[] @default([])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("store_settings")
 }
