@@ -1,7 +1,6 @@
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
 import { expireOverdueReservations } from "@/modules/inventory/expiration.service";
 
@@ -12,25 +11,8 @@ export const dynamic = "force-dynamic";
  * cron/job externo com o header `x-cron-secret` (ou `Authorization: Bearer`).
  * Protegido: sem segredo configurado ou com segredo inválido, responde 401.
  */
-function isAuthorized(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-
-  const bearer = request.headers
-    .get("authorization")
-    ?.replace(/^Bearer\s+/i, "")
-    .trim();
-  const provided = (request.headers.get("x-cron-secret") ?? bearer ?? "").trim();
-  if (!provided) return false;
-
-  const expected = Buffer.from(secret);
-  const actual = Buffer.from(provided);
-  if (expected.length !== actual.length) return false;
-  return timingSafeEqual(expected, actual);
-}
-
 async function handle(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

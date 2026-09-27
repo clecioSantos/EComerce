@@ -4,13 +4,19 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentUser } from "@/lib/auth/dal";
 
-import { placeOrder } from "./checkout.service";
+import { placeOrder, type PaymentResult } from "./checkout.service";
 import { checkoutOrderSchema, type CheckoutOrderInput } from "@/modules/orders/schemas";
+import {
+  friendlyMercadoPagoMessage,
+  MercadoPagoError,
+} from "@/modules/payments/providers/mercadopago/errors";
 
 export interface PlaceOrderActionResult {
   ok: boolean;
   orderId?: string;
   orderNumber?: string;
+  paymentStatus?: string;
+  payment?: PaymentResult | null;
   error?: string;
 }
 
@@ -23,14 +29,22 @@ export async function placeOrderAction(
     const result = await placeOrder(user?.id ?? null, parsed);
     revalidatePath("/carrinho");
     revalidatePath("/conta/pedidos");
-    return { ok: true, orderId: result.orderId, orderNumber: result.orderNumber };
+    return {
+      ok: true,
+      orderId: result.orderId,
+      orderNumber: result.orderNumber,
+      paymentStatus: result.paymentStatus,
+      payment: result.payment ?? null,
+    };
   } catch (error) {
     return {
       ok: false,
       error:
-        error instanceof Error
-          ? error.message
-          : "Não foi possível concluir o pedido.",
+        error instanceof MercadoPagoError
+          ? friendlyMercadoPagoMessage(error)
+          : error instanceof Error
+            ? error.message
+            : "Não foi possível concluir o pedido.",
     };
   }
 }

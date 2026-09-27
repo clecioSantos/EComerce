@@ -41,9 +41,7 @@ export class MockPaymentProvider implements PaymentProvider {
     return intent;
   }
 
-  async getPaymentStatus(
-    providerPaymentId: string,
-  ): Promise<PaymentIntent | null> {
+  async getPaymentStatus(providerPaymentId: string): Promise<PaymentIntent | null> {
     return this.intents.get(providerPaymentId) ?? null;
   }
 

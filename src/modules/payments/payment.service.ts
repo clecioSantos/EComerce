@@ -15,7 +15,10 @@ import { resolveExternalEventId } from "./events";
 import { getPaymentProvider } from "./registry";
 import { assertPaymentTransition, validatePaymentTransition } from "./state";
 import type {
+  CardPaymentDetails,
+  PayerDetails,
   PaymentIntent,
+  PaymentIntentStatus,
   PaymentMethodKind,
   WebhookPayload,
 } from "./types";
@@ -27,17 +30,29 @@ export interface InitiatePaymentInput {
   method: PaymentMethodKind;
   customer: { name: string; email: string };
   metadata?: Record<string, unknown>;
+  card?: CardPaymentDetails;
+  payer?: PayerDetails;
   /** Chave da tentativa de pagamento (idempotência). */
   idempotencyKey?: string | null;
 }
 
-function paymentToIntent(payment: Payment): PaymentIntent {
+export function paymentToIntent(payment: Payment): PaymentIntent {
+  const raw = (payment.metadata ?? null) as Record<string, unknown> | null;
+  const transactionData = (
+    raw?.point_of_interaction as
+      { transaction_data?: Record<string, unknown> } | undefined
+  )?.transaction_data;
   return {
     providerPaymentId: payment.providerPaymentId ?? "",
     status: payment.status,
     amount: Number(payment.amount),
     currency: payment.currency,
     method: payment.method,
+    qrCode: (transactionData?.qr_code as string | undefined) ?? undefined,
+    qrCodeBase64: (transactionData?.qr_code_base64 as string | undefined) ?? undefined,
+    ticketUrl: (transactionData?.ticket_url as string | undefined) ?? undefined,
+    expiresAt: (raw?.date_of_expiration as string | undefined) ?? undefined,
+    raw: payment.metadata ?? undefined,
   };
 }
 
@@ -94,6 +109,9 @@ export async function initiatePayment(input: InitiatePaymentInput) {
       method: input.method,
       customer: input.customer,
       metadata: input.metadata,
+      idempotencyKey: input.idempotencyKey ?? null,
+      card: input.card,
+      payer: input.payer,
     });
 
     const payment = claimed
@@ -102,8 +120,7 @@ export async function initiatePayment(input: InitiatePaymentInput) {
           data: {
             providerPaymentId: intent.providerPaymentId,
             status: intent.status,
-            metadata: (intent.raw ??
-              undefined) as Prisma.InputJsonValue | undefined,
+            metadata: (intent.raw ?? undefined) as Prisma.InputJsonValue | undefined,
             transactions: {
               create: {
                 type: "CHARGE",
@@ -123,8 +140,7 @@ export async function initiatePayment(input: InitiatePaymentInput) {
             status: intent.status,
             amount: input.amount,
             currency: input.currency,
-            metadata: (intent.raw ??
-              undefined) as Prisma.InputJsonValue | undefined,
+            metadata: (intent.raw ?? undefined) as Prisma.InputJsonValue | undefined,
             transactions: {
               create: {
                 type: "CHARGE",
@@ -165,6 +181,18 @@ export async function getPaymentStatus(
   providerPaymentId: string,
 ): Promise<PaymentIntent | null> {
   return getPaymentProvider(providerId).getPaymentStatus(providerPaymentId);
+}
+
+/** Último pagamento do pedido convertido para `PaymentIntent` (com QR, se PIX). */
+export async function getLatestPaymentIntent(
+  orderId: string,
+): Promise<{ payment: Payment; intent: PaymentIntent } | null> {
+  const payment = await prisma.payment.findFirst({
+    where: { orderId },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!payment) return null;
+  return { payment, intent: paymentToIntent(payment) };
 }
 
 /**
@@ -257,96 +285,120 @@ export async function refundOrder(orderId: string, reason?: string) {
 }
 
 /**
- * Processa um webhook de pagamento de forma idempotente e transacional.
+ * Aplica um status de pagamento vindo do provedor de forma idempotente e
+ * transacional. É a ÚNICA fonte de transição de pagamento/pedido:
+ * webhook, reconciliação e retorno síncrono convergem para cá.
  *
- * O `PaymentEvent` é criado na MESMA transação das alterações de negócio:
- * - se a criação violar a unicidade (provider + externalEventId), o evento já
- *   foi processado antes -> retorna `duplicate: true` sem repetir efeitos;
- * - se o processamento falhar, tudo (incluindo o evento) sofre rollback e o
- *   webhook pode ser reenviado;
- * - transições inválidas são registradas como FAILED sem alterar o negócio.
+ * - quando `externalEventId` é informado, cria um `PaymentEvent` na MESMA
+ *   transação (unicidade provider+evento garante dedupe);
+ * - transições inválidas são registradas como FAILED sem alterar o negócio;
+ * - `from === to` é no-op (reenvio idempotente);
+ * - falha de consulta NUNCA vira pagamento aprovado.
  */
-export async function handlePaymentWebhook(
-  providerId: string,
-  payload: WebhookPayload,
-) {
-  const provider = getPaymentProvider(providerId);
-  const result = await provider.handleWebhook(payload);
-  const externalEventId = resolveExternalEventId(payload);
-  const eventWhere = { provider_externalEventId: { provider: providerId, externalEventId } };
-  const requestId = await getRequestId();
+export interface ApplyPaymentStatusInput {
+  providerId: string;
+  providerPaymentId?: string | null;
+  status?: PaymentIntentStatus | null;
+  externalEventId?: string | null;
+  eventType?: string;
+  payload?: unknown;
+  source?: "webhook" | "reconciliation" | "sync";
+}
 
-  logEvent("WEBHOOK_RECEIVED", {
-    requestId,
-    provider: providerId,
+export interface ApplyPaymentStatusResult {
+  handled: boolean;
+  duplicate: boolean;
+  rejected?: boolean;
+  reason?: string;
+  orderId?: string;
+  providerPaymentId?: string;
+  status?: PaymentIntentStatus;
+}
+
+export async function applyPaymentStatus(
+  input: ApplyPaymentStatusInput,
+): Promise<ApplyPaymentStatusResult> {
+  const {
+    providerId,
+    providerPaymentId,
+    status,
     externalEventId,
-    providerEvent: payload.event,
-  });
+    eventType = "unknown",
+  } = input;
+  const requestId = await getRequestId();
+  const eventWhere = externalEventId
+    ? { provider_externalEventId: { provider: providerId, externalEventId } }
+    : null;
+
+  if (!providerPaymentId || !status) {
+    return { handled: false, duplicate: false };
+  }
 
   try {
     return await prisma.$transaction(async (tx) => {
-      await tx.paymentEvent.create({
-        data: {
-          provider: providerId,
-          externalEventId,
-          eventType: payload.event || "unknown",
-          payload: (payload.raw ?? undefined) as Prisma.InputJsonValue | undefined,
-          status: "PROCESSING",
-        },
-      });
+      if (externalEventId && eventWhere) {
+        await tx.paymentEvent.create({
+          data: {
+            provider: providerId,
+            externalEventId,
+            eventType,
+            payload: (input.payload ?? undefined) as Prisma.InputJsonValue | undefined,
+            status: "PROCESSING",
+          },
+        });
+      }
 
-      const markProcessed = () =>
-        tx.paymentEvent.update({
+      const markProcessed = async () => {
+        if (!eventWhere) return;
+        await tx.paymentEvent.update({
           where: eventWhere,
           data: { status: "PROCESSED", processedAt: new Date() },
         });
-
-      if (!result.providerPaymentId || !result.status) {
-        await markProcessed();
-        return { ...result, duplicate: false };
-      }
+      };
 
       const payment = await tx.payment.findFirst({
-        where: {
-          provider: providerId,
-          providerPaymentId: result.providerPaymentId,
-        },
+        where: { provider: providerId, providerPaymentId },
       });
       if (!payment) {
         await markProcessed();
-        return { ...result, duplicate: false };
+        return { handled: false, duplicate: false, providerPaymentId, status };
       }
 
-      const validation = validatePaymentTransition(payment.status, result.status);
+      const validation = validatePaymentTransition(payment.status, status);
       if (!validation.valid) {
-        await tx.paymentEvent.update({
-          where: eventWhere,
-          data: { status: "FAILED", processedAt: new Date() },
-        });
+        if (eventWhere) {
+          await tx.paymentEvent.update({
+            where: eventWhere,
+            data: { status: "FAILED", processedAt: new Date() },
+          });
+        }
         logEvent("WEBHOOK_REJECTED", {
           requestId,
           provider: providerId,
-          externalEventId,
+          externalEventId: externalEventId ?? undefined,
           reason: validation.error,
         });
         return {
-          ...result,
+          handled: true,
           duplicate: false,
           rejected: true,
           reason: validation.error,
+          orderId: payment.orderId,
+          providerPaymentId,
+          status,
         };
       }
 
       await tx.payment.update({
         where: { id: payment.id },
-        data: { status: result.status },
+        data: { status },
       });
 
       const order = await tx.order.findUnique({
         where: { id: payment.orderId },
       });
       if (order) {
-        if (result.status === "PAID") {
+        if (status === "PAID") {
           if (order.status === "PENDING") {
             // Consome as reservas e marca o pedido como PAID.
             await consumeOrderReservations(tx, order.id);
@@ -362,28 +414,28 @@ export async function handlePaymentWebhook(
         } else {
           await tx.order.update({
             where: { id: order.id },
-            data: { paymentStatus: result.status },
+            data: { paymentStatus: status },
           });
         }
       }
 
       await markProcessed();
 
-      if (result.status === "PAID") {
+      if (status === "PAID") {
         logEvent("PAYMENT_APPROVED", {
           requestId,
           provider: providerId,
           paymentId: payment.id,
           orderId: payment.orderId,
         });
-      } else if (result.status === "FAILED") {
+      } else if (status === "FAILED") {
         logEvent("PAYMENT_FAILED", {
           requestId,
           provider: providerId,
           paymentId: payment.id,
           orderId: payment.orderId,
         });
-      } else if (result.status === "REFUNDED") {
+      } else if (status === "REFUNDED") {
         logEvent("PAYMENT_REFUNDED", {
           requestId,
           provider: providerId,
@@ -392,18 +444,56 @@ export async function handlePaymentWebhook(
         });
       }
 
-      return { ...result, duplicate: false };
+      return {
+        handled: true,
+        duplicate: false,
+        orderId: payment.orderId,
+        providerPaymentId,
+        status,
+      };
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       logEvent("WEBHOOK_DUPLICATE", {
         requestId,
         provider: providerId,
-        externalEventId,
+        externalEventId: externalEventId ?? undefined,
       });
-      // Evento já processado anteriormente.
-      return { ...result, duplicate: true };
+      return {
+        handled: true,
+        duplicate: true,
+        providerPaymentId,
+        status,
+      };
     }
     throw error;
   }
+}
+
+/**
+ * Processa um webhook de pagamento: delega ao provider (que consulta o estado
+ * real no Mercado Pago) e aplica via `applyPaymentStatus`.
+ */
+export async function handlePaymentWebhook(providerId: string, payload: WebhookPayload) {
+  const provider = getPaymentProvider(providerId);
+  const result = await provider.handleWebhook(payload);
+  const externalEventId = resolveExternalEventId(payload);
+  const requestId = await getRequestId();
+
+  logEvent("WEBHOOK_RECEIVED", {
+    requestId,
+    provider: providerId,
+    externalEventId,
+    providerEvent: payload.event,
+  });
+
+  return applyPaymentStatus({
+    providerId,
+    providerPaymentId: result.providerPaymentId,
+    status: result.status,
+    externalEventId,
+    eventType: payload.event || "unknown",
+    payload: payload.raw,
+    source: "webhook",
+  });
 }

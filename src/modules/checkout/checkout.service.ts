@@ -6,8 +6,11 @@ import type { CartDTO } from "@/modules/cart/types";
 import { getActiveCart, mapCart } from "@/modules/cart/cart.service";
 import { confirmOrderPayment, createOrder } from "@/modules/orders/order.service";
 import type { CheckoutOrderInput } from "@/modules/orders/schemas";
-import { initiatePayment } from "@/modules/payments/payment.service";
-import type { PaymentMethodKind } from "@/modules/payments/types";
+import {
+  getLatestPaymentIntent,
+  initiatePayment,
+} from "@/modules/payments/payment.service";
+import type { PaymentIntent, PaymentMethodKind } from "@/modules/payments/types";
 import {
   calculatePricing,
   roundMoney,
@@ -163,11 +166,36 @@ export async function getCheckoutSummary(
   return buildSummary(context, userId, { ...options, tolerateShippingError: true });
 }
 
+export interface PaymentResult {
+  id: string;
+  providerPaymentId: string;
+  status: string;
+  method: string;
+  qrCode?: string;
+  qrCodeBase64?: string;
+  ticketUrl?: string;
+  expiresAt?: string;
+}
+
 export interface PlaceOrderResult {
   orderId: string;
   orderNumber: string;
   paymentStatus: string;
   checkoutUrl?: string;
+  payment?: PaymentResult | null;
+}
+
+function toPaymentResult(paymentId: string, intent: PaymentIntent): PaymentResult {
+  return {
+    id: paymentId,
+    providerPaymentId: intent.providerPaymentId,
+    status: intent.status,
+    method: intent.method,
+    qrCode: intent.qrCode,
+    qrCodeBase64: intent.qrCodeBase64,
+    ticketUrl: intent.ticketUrl,
+    expiresAt: intent.expiresAt,
+  };
 }
 
 export async function placeOrder(
@@ -235,14 +263,14 @@ export async function placeOrder(
       if (existing.requestHash && existing.requestHash !== requestHash) {
         throw new Error("Idempotency-Key reutilizada com um payload diferente.");
       }
-      const payment = await prisma.payment.findFirst({
-        where: { orderId: existing.id },
-        orderBy: { createdAt: "desc" },
-      });
+      const latest = await getLatestPaymentIntent(existing.id);
       return {
         orderId: existing.id,
         orderNumber: existing.number,
-        paymentStatus: payment?.status ?? existing.paymentStatus,
+        paymentStatus: latest?.payment.status ?? existing.paymentStatus,
+        payment: latest
+          ? toPaymentResult(latest.payment.id, latest.intent)
+          : null,
       };
     }
   }
@@ -295,19 +323,32 @@ export async function placeOrder(
     orderBy: { createdAt: "desc" },
   });
   if (existingPayment) {
+    const latest = await getLatestPaymentIntent(order.id);
     return {
       orderId: order.id,
       orderNumber: order.number,
       paymentStatus: existingPayment.status,
+      payment: latest ? toPaymentResult(latest.payment.id, latest.intent) : null,
     };
   }
 
-  const { intent } = await initiatePayment({
+  const { payment, intent } = await initiatePayment({
     orderId: order.id,
     amount: summary.pricing.grandTotal,
     currency: context.cart.currency,
     method: input.paymentMethod as PaymentMethodKind,
     customer: { name: input.customer.name, email: input.customer.email },
+    card: input.card
+      ? {
+          token: input.card.token,
+          installments: input.card.installments,
+          issuerId: input.card.issuerId ?? undefined,
+          paymentMethodId: input.card.paymentMethodId ?? undefined,
+        }
+      : undefined,
+    payer: input.card?.identification
+      ? { identification: input.card.identification }
+      : undefined,
     metadata: { orderNumber: order.number },
     idempotencyKey: input.idempotencyKey ?? null,
   });
@@ -321,6 +362,7 @@ export async function placeOrder(
     orderNumber: order.number,
     paymentStatus: intent.status,
     checkoutUrl: intent.checkoutUrl,
+    payment: toPaymentResult(payment.id, intent),
   };
 }
 

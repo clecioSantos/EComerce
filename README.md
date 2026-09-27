@@ -263,6 +263,23 @@ Nenhuma lógica de pedido precisa mudar.
 
 ---
 
+## Mercado Pago (PIX e cartão)
+
+O gateway `mercadopago` está registrado em
+`src/modules/payments/registry.ts`. Para ativá-lo, defina
+`PAYMENT_PROVIDER=mercadopago` e configure as variáveis `MERCADOPAGO_*` (ver
+`.env.example`). Conecte a conta da loja em **Admin → Pagamentos** (OAuth).
+
+- **Webhook**: `POST /api/webhooks/mercadopago` (assinatura `x-signature` obrigatória).
+- **Reconciliação**: `GET/POST /api/internal/reconcile-payments` (protegido por `CRON_SECRET`).
+- **Transições**: centralizadas em `applyPaymentStatus`
+  (`src/modules/payments/payment.service.ts`), idempotentes e reutilizadas por
+  webhook, reconciliação e polling.
+
+Documentação completa: [`docs/mercadopago.md`](docs/mercadopago.md).
+
+---
+
 ## Promoções e cupons
 
 - **Admin → Promoções**: descontos **automáticos** (não exigem cupom), com tipo

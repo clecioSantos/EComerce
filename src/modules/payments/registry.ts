@@ -1,3 +1,4 @@
+import { MercadoPagoProvider } from "./providers/mercadopago/provider";
 import { MockPaymentProvider } from "./providers/mock.provider";
 import type { PaymentProvider } from "./types";
 
@@ -25,3 +26,4 @@ export function hasPaymentProvider(id: string): boolean {
 
 // Registro dos providers disponíveis. Adicione novos providers aqui.
 registerPaymentProvider(new MockPaymentProvider());
+registerPaymentProvider(new MercadoPagoProvider());

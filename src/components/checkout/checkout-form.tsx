@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { PixPanel } from "@/components/checkout/pix-panel";
 import { formatCurrency } from "@/lib/format";
+import { getMercadoPagoInstance } from "@/lib/mercadopago/client";
 import type { CartDTO } from "@/modules/cart/types";
 import { placeOrderAction } from "@/modules/checkout/checkout.actions";
 import { createAddressAction } from "@/modules/customers/address.actions";
@@ -47,6 +49,11 @@ function formatAddressOption(address: CustomerAddressDTO): string {
   return `${prefix}${address.recipient} · ${address.city}/${address.state}`;
 }
 
+function normalizeYear(year: string): string {
+  const digits = onlyDigits(year);
+  return digits.length === 2 ? `20${digits}` : digits;
+}
+
 interface FormValues {
   customerName: string;
   customerEmail: string;
@@ -61,6 +68,28 @@ interface FormValues {
   notes: string;
 }
 
+interface CardFormValues {
+  number: string;
+  holder: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cvv: string;
+  installments: string;
+  docType: string;
+  docNumber: string;
+}
+
+const EMPTY_CARD: CardFormValues = {
+  number: "",
+  holder: "",
+  expiryMonth: "",
+  expiryYear: "",
+  cvv: "",
+  installments: "1",
+  docType: "CPF",
+  docNumber: "",
+};
+
 export function CheckoutForm({
   cart,
   pricing,
@@ -68,6 +97,8 @@ export function CheckoutForm({
   addresses,
   canSaveAddress,
   defaultCustomer,
+  paymentProvider,
+  mercadoPagoPublicKey,
 }: {
   cart: CartDTO;
   /** Preços sem frete (o frete é somado no cliente conforme a seleção). */
@@ -76,6 +107,8 @@ export function CheckoutForm({
   addresses: CustomerAddressDTO[];
   canSaveAddress: boolean;
   defaultCustomer: { name: string; email: string };
+  paymentProvider: string;
+  mercadoPagoPublicKey: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -93,6 +126,19 @@ export function CheckoutForm({
     defaultAddress?.id ?? "new",
   );
   const [saveAddress, setSaveAddress] = useState(false);
+  const [card, setCard] = useState<CardFormValues>(EMPTY_CARD);
+  const [paymentResult, setPaymentResult] = useState<{
+    orderId: string;
+    orderNumber: string;
+    payment: {
+      status: string;
+      method: string;
+      qrCode?: string;
+      qrCodeBase64?: string;
+      ticketUrl?: string;
+      expiresAt?: string;
+    };
+  } | null>(null);
   const { register, handleSubmit, getValues, setValue } = useForm<FormValues>({
     defaultValues: {
       customerName: defaultCustomer.name,
@@ -195,6 +241,47 @@ export function CheckoutForm({
     }
   }
 
+  async function buildCardPayload() {
+    if (!mercadoPagoPublicKey) {
+      toast.error("Pagamento com cartão indisponível no momento.");
+      return undefined;
+    }
+    if (
+      !card.number ||
+      !card.cvv ||
+      !card.expiryMonth ||
+      !card.expiryYear ||
+      !card.holder
+    ) {
+      toast.error("Preencha os dados do cartão.");
+      return undefined;
+    }
+
+    try {
+      const mp = await getMercadoPagoInstance(mercadoPagoPublicKey);
+      const token = await mp.createCardToken({
+        cardNumber: onlyDigits(card.number),
+        securityCode: card.cvv,
+        expirationMonth: card.expiryMonth.padStart(2, "0"),
+        expirationYear: normalizeYear(card.expiryYear),
+        cardholderName: card.holder,
+        identificationType: card.docNumber ? card.docType : undefined,
+        identificationNumber: card.docNumber ? onlyDigits(card.docNumber) : undefined,
+      });
+      return {
+        token: token.id,
+        installments: Number(card.installments) || 1,
+        paymentMethodId: token.payment_method_id ?? "credit_card",
+        identification: card.docNumber
+          ? { type: card.docType, number: onlyDigits(card.docNumber) }
+          : undefined,
+      };
+    } catch {
+      toast.error("Não foi possível validar o cartão. Confira os dados.");
+      return undefined;
+    }
+  }
+
   const onSubmit = handleSubmit((values) => {
     if (!selectedId) {
       toast.error("Selecione uma opção de frete.");
@@ -220,6 +307,18 @@ export function CheckoutForm({
         else toast.error(saved.error ?? "Não foi possível salvar o endereço.");
       }
 
+      const cardPayload =
+        paymentMethod === "CREDIT_CARD" && paymentProvider === "mercadopago"
+          ? await buildCardPayload()
+          : undefined;
+      if (
+        paymentMethod === "CREDIT_CARD" &&
+        paymentProvider === "mercadopago" &&
+        !cardPayload
+      ) {
+        return;
+      }
+
       const result = await placeOrderAction({
         customer: {
           name: values.customerName,
@@ -238,12 +337,27 @@ export function CheckoutForm({
         },
         shippingOptionId: selectedId,
         paymentMethod,
+        card: cardPayload ?? null,
         couponCode: couponCode,
         notes: values.notes || null,
         idempotencyKey,
       });
 
       if (result.ok && result.orderId) {
+        const payment = result.payment;
+        if (
+          payment &&
+          (payment.status === "PENDING" || payment.status === "AUTHORIZED")
+        ) {
+          toast.success("Pedido criado. Aguardando pagamento.");
+          setPaymentResult({
+            orderId: result.orderId,
+            orderNumber: result.orderNumber ?? "",
+            payment,
+          });
+          router.refresh();
+          return;
+        }
         toast.success("Pedido realizado!");
         router.push(`/checkout/sucesso?orderId=${result.orderId}`);
         router.refresh();
@@ -252,6 +366,31 @@ export function CheckoutForm({
       }
     });
   });
+
+  if (paymentResult) {
+    if (paymentResult.payment.method === "PIX") {
+      return (
+        <div className="mx-auto w-full max-w-xl rounded-lg border p-6">
+          <PixPanel
+            orderId={paymentResult.orderId}
+            orderNumber={paymentResult.orderNumber}
+            qrCode={paymentResult.payment.qrCode ?? null}
+            qrCodeBase64={paymentResult.payment.qrCodeBase64 ?? null}
+            ticketUrl={paymentResult.payment.ticketUrl ?? null}
+            expiresAt={paymentResult.payment.expiresAt ?? null}
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="mx-auto w-full max-w-xl rounded-lg border p-6">
+        <p className="text-sm">
+          Pedido <strong>{paymentResult.orderNumber}</strong> criado e aguardando
+          confirmação do pagamento.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
@@ -415,12 +554,114 @@ export function CheckoutForm({
             <SelectContent>
               <SelectItem value="PIX">PIX</SelectItem>
               <SelectItem value="CREDIT_CARD">Cartão de crédito</SelectItem>
-              <SelectItem value="BOLETO">Boleto</SelectItem>
+              {paymentProvider !== "mercadopago" ? (
+                <SelectItem value="BOLETO">Boleto</SelectItem>
+              ) : null}
             </SelectContent>
           </Select>
+
+          {paymentProvider === "mercadopago" && paymentMethod === "PIX" ? (
+            <p className="text-muted-foreground text-xs">
+              O QR Code PIX será exibido após a confirmação do pedido.
+            </p>
+          ) : null}
+
+          {paymentProvider === "mercadopago" && paymentMethod === "CREDIT_CARD" ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="card-number">Número do cartão</Label>
+                <Input
+                  id="card-number"
+                  inputMode="numeric"
+                  autoComplete="cc-number"
+                  value={card.number}
+                  onChange={(event) => setCard({ ...card, number: event.target.value })}
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="card-holder">Nome impresso no cartão</Label>
+                <Input
+                  id="card-holder"
+                  autoComplete="cc-name"
+                  value={card.holder}
+                  onChange={(event) => setCard({ ...card, holder: event.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="card-exp-month">Validade (MM/AA)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="card-exp-month"
+                    placeholder="MM"
+                    maxLength={2}
+                    value={card.expiryMonth}
+                    onChange={(event) =>
+                      setCard({ ...card, expiryMonth: event.target.value })
+                    }
+                  />
+                  <Input
+                    placeholder="AA"
+                    maxLength={2}
+                    value={card.expiryYear}
+                    onChange={(event) =>
+                      setCard({ ...card, expiryYear: event.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="card-cvv">CVV</Label>
+                <Input
+                  id="card-cvv"
+                  inputMode="numeric"
+                  maxLength={4}
+                  autoComplete="cc-csc"
+                  value={card.cvv}
+                  onChange={(event) => setCard({ ...card, cvv: event.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="card-installments">Parcelas</Label>
+                <Select
+                  value={card.installments}
+                  onValueChange={(value) => {
+                    if (value) setCard({ ...card, installments: value });
+                  }}
+                >
+                  <SelectTrigger id="card-installments" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6].map((count) => (
+                      <SelectItem key={count} value={String(count)}>
+                        {count}x
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="card-doc">CPF/CNPJ do titular</Label>
+                <Input
+                  id="card-doc"
+                  inputMode="numeric"
+                  value={card.docNumber}
+                  onChange={(event) =>
+                    setCard({ ...card, docNumber: event.target.value })
+                  }
+                />
+              </div>
+              <p className="text-muted-foreground text-xs sm:col-span-2">
+                Os dados do cartão são tokenizados pelo Mercado Pago no seu navegador e
+                nunca passam pela loja.
+              </p>
+            </div>
+          ) : null}
+
           <p className="text-muted-foreground text-xs">
-            Pagamento simulado (provider de desenvolvimento). Nenhuma cobrança real é
-            feita.
+            {paymentProvider === "mercadopago"
+              ? "Pagamento processado pelo Mercado Pago."
+              : "Pagamento simulado (provider de desenvolvimento). Nenhuma cobrança real é feita."}
           </p>
         </section>
 

@@ -27,25 +27,34 @@ export function CouponForm() {
   const [minSubtotal, setMinSubtotal] = useState("");
 
   function submit() {
+    if (code.trim().length < 3) {
+      toast.error("Informe um código com ao menos 3 caracteres.");
+      return;
+    }
+
     startTransition(async () => {
-      const result = await createCouponAction({
-        code,
-        description: null,
-        type,
-        value: type === "FREE_SHIPPING" ? 0 : Number(value) || 0,
-        minSubtotal: minSubtotal ? Number(minSubtotal) : null,
-        maxUses: null,
-        maxUsesPerUser: null,
-        isActive: true,
-        startsAt: null,
-        endsAt: null,
-      });
-      if (result.ok) {
-        toast.success("Cupom criado.");
-        setCode("");
-        router.refresh();
-      } else {
-        toast.error(result.error ?? "Erro ao criar cupom.");
+      try {
+        const result = await createCouponAction({
+          code,
+          description: null,
+          type,
+          value: type === "FREE_SHIPPING" ? 0 : Number(value) || 0,
+          minSubtotal: minSubtotal ? Number(minSubtotal) : null,
+          maxUses: null,
+          maxUsesPerUser: null,
+          isActive: true,
+          startsAt: null,
+          endsAt: null,
+        });
+        if (result.ok) {
+          toast.success("Cupom criado.");
+          setCode("");
+          router.refresh();
+        } else {
+          toast.error(result.error ?? "Erro ao criar cupom.");
+        }
+      } catch {
+        toast.error("Erro ao criar cupom. Tente novamente.");
       }
     });
   }
@@ -104,7 +113,7 @@ export function CouponForm() {
           />
         </div>
       </div>
-      <Button onClick={submit} disabled={pending || code.trim().length < 3}>
+      <Button onClick={submit} disabled={pending}>
         {pending ? "Criando..." : "Criar cupom"}
       </Button>
     </div>

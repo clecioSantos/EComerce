@@ -648,6 +648,48 @@ model PaymentEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Contas de provedores de pagamento (OAuth) e states de autorização
+// ---------------------------------------------------------------------------
+
+// Credenciais da conta do provedor conectada à loja (ex.: Mercado Pago OAuth).
+// Tokens são persistidos CIFRADOS (AES-256-GCM) pela camada de aplicação e
+// nunca devem ser retornados para o cliente nem logados.
+model PaymentProviderAccount {
+  id                 String    @id @default(cuid())
+  provider           String    @unique
+  providerUserId     String?
+  accessToken        String
+  refreshToken       String?
+  publicKey          String?
+  tokenType          String?
+  scope              String?
+  expiresAt          DateTime?
+  // Lease para serializar renovações concorrentes do refresh token.
+  refreshLockedUntil DateTime?
+  liveMode           Boolean   @default(false)
+  connectedAt        DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("payment_provider_accounts")
+}
+
+// Estado OAuth de uso único (anti-CSRF/replay). Consumido no callback.
+model PaymentOAuthState {
+  id           String    @id @default(cuid())
+  state        String    @unique
+  provider     String
+  userId       String
+  codeVerifier String?
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([provider, state])
+  @@index([expiresAt])
+  @@map("payment_oauth_states")
+}
+
+// ---------------------------------------------------------------------------
 // Promoções e cupons
 // ---------------------------------------------------------------------------
 

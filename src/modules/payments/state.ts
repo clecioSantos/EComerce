@@ -49,10 +49,7 @@ export function canTransitionPaymentStatus(
   return (PAYMENT_TRANSITIONS[from] ?? []).includes(to);
 }
 
-export function assertPaymentTransition(
-  from: PaymentStatus,
-  to: PaymentStatus,
-): void {
+export function assertPaymentTransition(from: PaymentStatus, to: PaymentStatus): void {
   const result = validatePaymentTransition(from, to);
   if (!result.valid) {
     throw new Error(result.error);

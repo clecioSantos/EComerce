@@ -27,6 +27,22 @@ export const checkoutOrderSchema = z.object({
   paymentMethod: z
     .enum(["CREDIT_CARD", "DEBIT_CARD", "PIX", "BOLETO", "WALLET", "OTHER"])
     .default("PIX"),
+  card: z
+    .object({
+      token: z.string().min(1).max(512),
+      installments: z.coerce.number().int().min(1).max(24).optional(),
+      issuerId: z.string().max(64).optional().nullable(),
+      paymentMethodId: z.string().max(64).optional().nullable(),
+      identification: z
+        .object({
+          type: z.string().min(1).max(10),
+          number: z.string().min(1).max(20),
+        })
+        .optional()
+        .nullable(),
+    })
+    .optional()
+    .nullable(),
   couponCode: z.string().max(40).optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   idempotencyKey: z.string().min(8).max(120).optional().nullable(),

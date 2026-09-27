@@ -7,20 +7,30 @@
  */
 
 export type PaymentIntentStatus =
-  | "PENDING"
-  | "AUTHORIZED"
-  | "PAID"
-  | "FAILED"
-  | "REFUNDED"
-  | "CANCELED";
+  "PENDING" | "AUTHORIZED" | "PAID" | "FAILED" | "REFUNDED" | "CANCELED";
 
 export type PaymentMethodKind =
-  | "CREDIT_CARD"
-  | "DEBIT_CARD"
-  | "PIX"
-  | "BOLETO"
-  | "WALLET"
-  | "OTHER";
+  "CREDIT_CARD" | "DEBIT_CARD" | "PIX" | "BOLETO" | "WALLET" | "OTHER";
+
+export interface PayerIdentification {
+  type: string;
+  number: string;
+}
+
+export interface PayerDetails {
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  identification?: PayerIdentification;
+}
+
+/** Dados de cartão já tokenizados no browser (nunca trafegam PAN/CVV). */
+export interface CardPaymentDetails {
+  token: string;
+  installments?: number;
+  issuerId?: string;
+  paymentMethodId?: string;
+}
 
 export interface CreatePaymentInput {
   orderId: string;
@@ -32,6 +42,11 @@ export interface CreatePaymentInput {
     email: string;
   };
   metadata?: Record<string, unknown>;
+  /** Chave determinística para o `X-Idempotency-Key` do provedor. */
+  idempotencyKey?: string | null;
+  /** Dados tokenizados do cartão (obrigatórios para CREDIT_CARD/DEBIT_CARD). */
+  card?: CardPaymentDetails;
+  payer?: PayerDetails;
 }
 
 export interface PaymentIntent {
@@ -44,6 +59,12 @@ export interface PaymentIntent {
   checkoutUrl?: string;
   /** Código PIX copia-e-cola, quando aplicável. */
   qrCode?: string;
+  /** Imagem do QR Code em base64 (sem prefixo data URI). */
+  qrCodeBase64?: string;
+  /** Página do Mercado Pago com o QR/instruções. */
+  ticketUrl?: string;
+  /** Detalhe bruto do status do provedor (ex.: `accredited`). */
+  statusDetail?: string;
   expiresAt?: string;
   raw?: unknown;
 }

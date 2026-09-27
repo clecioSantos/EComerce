@@ -4,6 +4,7 @@ import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/dal";
+import { getEnv } from "@/lib/env";
 import { getCheckoutSummary } from "@/modules/checkout/checkout.service";
 import { listCustomerAddresses } from "@/modules/customers/customer.service";
 
@@ -56,6 +57,8 @@ export default async function CheckoutPage({
           name: session?.user?.name ?? "",
           email: session?.user?.email ?? "",
         }}
+        paymentProvider={getEnv().PAYMENT_PROVIDER}
+        mercadoPagoPublicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? null}
       />
     </div>
   );

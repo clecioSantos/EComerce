@@ -2,6 +2,7 @@
 
 import {
   Boxes,
+  CreditCard,
   LayoutDashboard,
   Menu,
   Package,
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
   { href: "/admin/atributos", label: "Atributos", icon: Tags },
   { href: "/admin/estoque", label: "Estoque", icon: Warehouse },
   { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingCart },
+  { href: "/admin/pagamentos", label: "Pagamentos", icon: CreditCard },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/cupons", label: "Cupons", icon: Ticket },
   { href: "/admin/promocoes", label: "Promoções", icon: Percent },
