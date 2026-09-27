@@ -59,6 +59,7 @@ export async function completeMercadoPagoOAuth(params: {
     throw new MercadoPagoError({
       kind: "validation",
       message: "State OAuth inválido, expirado ou já utilizado.",
+      code: "state_invalid",
     });
   }
 

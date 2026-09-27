@@ -2,14 +2,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdmin } from "@/lib/auth/dal";
 import { logger } from "@/lib/logger";
+import { MercadoPagoError } from "@/modules/payments/providers/mercadopago/errors";
 import { completeMercadoPagoOAuth } from "@/modules/payments/oauth/oauth.service";
 
 export const dynamic = "force-dynamic";
 
 /** Callback do OAuth: valida o state, troca o code e persiste os tokens. */
 export async function GET(request: NextRequest) {
-  const target = (status: string) =>
-    NextResponse.redirect(new URL(`/admin/pagamentos?oauth=${status}`, request.url));
+  const target = (status: string, reason?: string) => {
+    const url = new URL("/admin/pagamentos", request.url);
+    url.searchParams.set("oauth", status);
+    if (reason) url.searchParams.set("reason", reason);
+    return NextResponse.redirect(url);
+  };
 
   let adminId: string;
   try {
@@ -25,12 +30,17 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state");
   const oauthError = request.nextUrl.searchParams.get("error");
 
-  if (oauthError || !code || !state) {
+  if (oauthError) {
     logger.warn({
       event: "PAYMENT_OAUTH_CALLBACK_REJECTED",
-      reason: oauthError ?? "missing",
+      reason: oauthError,
+      description: request.nextUrl.searchParams.get("error_description") ?? undefined,
     });
-    return target("error");
+    return target("error", "denied");
+  }
+  if (!code || !state) {
+    logger.warn({ event: "PAYMENT_OAUTH_CALLBACK_REJECTED", reason: "missing_params" });
+    return target("error", "missing_params");
   }
 
   try {
@@ -38,14 +48,17 @@ export async function GET(request: NextRequest) {
     if (result.userId !== adminId) {
       // O state pertence a outro usuário: não vincula a conta.
       logger.error({ event: "PAYMENT_OAUTH_STATE_MISMATCH" });
-      return target("error");
+      return target("error", "state_mismatch");
     }
     return target("success");
   } catch (error) {
+    const reason =
+      error instanceof MercadoPagoError && error.code ? error.code : "exchange_failed";
     logger.error({
       event: "PAYMENT_OAUTH_CALLBACK_FAILED",
+      reason,
       error: error instanceof Error ? error.message : String(error),
     });
-    return target("error");
+    return target("error", reason);
   }
 }

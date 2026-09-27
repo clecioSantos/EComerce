@@ -36,6 +36,16 @@ export default async function AdminPaymentsPage({
 }) {
   const params = await searchParams;
   const oauthStatus = typeof params.oauth === "string" ? params.oauth : undefined;
+  const oauthReason = typeof params.reason === "string" ? params.reason : undefined;
+
+  const OAUTH_REASON_MESSAGES: Record<string, string> = {
+    denied: "A autorização foi negada ou cancelada no Mercado Pago.",
+    missing_params: "O Mercado Pago não retornou o code/state.",
+    state_invalid: "O state expirou ou já foi usado. Tente conectar novamente.",
+    state_mismatch: "A sessão do administrador mudou durante a conexão.",
+    exchange_failed:
+      "Falha ao trocar o code por tokens. Confira Client ID/Secret, Redirect URI e se o app está com a URL cadastrada.",
+  };
 
   const env = getEnv();
   const account = await getMercadoPagoAccount();
@@ -92,8 +102,10 @@ export default async function AdminPaymentsPage({
       ) : null}
       {oauthStatus === "error" ? (
         <p className="border-destructive/40 bg-destructive/10 rounded-md border px-4 py-3 text-sm">
-          Não foi possível concluir a conexão. Veja abaixo o que está faltando ou
-          incorreto antes de tentar novamente.
+          Não foi possível concluir a conexão.{" "}
+          {oauthReason
+            ? OAUTH_REASON_MESSAGES[oauthReason]
+            : "Veja abaixo o que está faltando ou incorreto."}
         </p>
       ) : null}
 
