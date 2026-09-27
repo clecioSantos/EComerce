@@ -20,7 +20,10 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { PixPanel } from "@/components/checkout/pix-panel";
 import { formatCurrency } from "@/lib/format";
-import { getMercadoPagoInstance } from "@/lib/mercadopago/client";
+import {
+  getMercadoPagoInstance,
+  getMercadoPagoPublicKey,
+} from "@/lib/mercadopago/client";
 import type { CartDTO } from "@/modules/cart/types";
 import { placeOrderAction } from "@/modules/checkout/checkout.actions";
 import { createAddressAction } from "@/modules/customers/address.actions";
@@ -243,7 +246,8 @@ export function CheckoutForm({
   }
 
   async function buildCardPayload() {
-    if (!mercadoPagoPublicKey) {
+    const publicKey = mercadoPagoPublicKey ?? getMercadoPagoPublicKey();
+    if (!publicKey) {
       toast.error("Pagamento com cartão indisponível no momento.");
       return undefined;
     }
@@ -259,7 +263,7 @@ export function CheckoutForm({
     }
 
     try {
-      const mp = await getMercadoPagoInstance(mercadoPagoPublicKey);
+      const mp = await getMercadoPagoInstance(publicKey);
       const token = await mp.createCardToken({
         cardNumber: onlyDigits(card.number),
         securityCode: card.cvv,
@@ -328,7 +332,7 @@ export function CheckoutForm({
         return;
       }
 
-      const result = await placeOrderAction({
+      const orderInput = {
         customer: {
           name: values.customerName,
           email: values.customerEmail,
@@ -350,7 +354,15 @@ export function CheckoutForm({
         couponCode: couponCode,
         notes: values.notes || null,
         idempotencyKey,
+      };
+
+      console.info("[pagamento] enviando pedido:", {
+        ...orderInput,
+        card: cardPayload ? { ...cardPayload, token: "***token***" } : null,
       });
+
+      const result = await placeOrderAction(orderInput);
+      console.info("[pagamento] resposta:", result);
 
       if (result.ok && result.orderId) {
         const payment = result.payment;

@@ -3,10 +3,13 @@ import "server-only";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { prisma } from "@/lib/db/prisma";
 import { getEnv } from "@/lib/env";
-import { logEvent } from "@/lib/logger";
+import { logEvent, logger } from "@/lib/logger";
 
 import { requestOAuthToken } from "../providers/mercadopago/client";
-import { isMercadoPagoSandbox } from "../providers/mercadopago/environment";
+import {
+  accessTokenMatchesEnvironment,
+  isMercadoPagoSandbox,
+} from "../providers/mercadopago/environment";
 import { MercadoPagoError } from "../providers/mercadopago/errors";
 
 export const MERCADOPAGO_PROVIDER_ID = "mercadopago";
@@ -109,26 +112,64 @@ export async function disconnectMercadoPago(): Promise<void> {
  */
 export async function getValidMercadoPagoAccessToken(): Promise<string> {
   const env = getEnv();
+  const sandbox = isMercadoPagoSandbox(env.MERCADOPAGO_ENVIRONMENT);
+
+  // Tokens estáticos são específicos do ambiente e NUNCA devem cruzar
+  // sandbox/produção.
+  const staticToken = sandbox
+    ? env.MERCADOPAGO_SANDBOX_ACCESS_TOKEN
+    : env.MERCADOPAGO_ACCESS_TOKEN;
 
   // Em sandbox, o token de teste estático tem prioridade e dispensa OAuth —
-  // facilita testar PIX/cartão localmente.
-  if (
-    isMercadoPagoSandbox(env.MERCADOPAGO_ENVIRONMENT) &&
-    env.MERCADOPAGO_SANDBOX_ACCESS_TOKEN
-  ) {
-    return env.MERCADOPAGO_SANDBOX_ACCESS_TOKEN;
+  // facilita testar PIX/cartão localmente. Ele precisa ser realmente de teste.
+  if (sandbox && staticToken) {
+    if (!accessTokenMatchesEnvironment(staticToken, "sandbox")) {
+      throw new MercadoPagoError({
+        kind: "validation",
+        code: "invalid_sandbox_token",
+        message:
+          "MERCADOPAGO_SANDBOX_ACCESS_TOKEN deve começar com TEST- quando MERCADOPAGO_ENVIRONMENT=sandbox.",
+      });
+    }
+    return staticToken;
   }
 
-  const staticToken = env.MERCADOPAGO_ACCESS_TOKEN;
   const account = await prisma.paymentProviderAccount.findUnique({
     where: { provider: MERCADOPAGO_PROVIDER_ID },
   });
 
   if (!account) {
-    if (staticToken) return staticToken;
+    if (staticToken) {
+      if (!accessTokenMatchesEnvironment(staticToken, "production")) {
+        logger.warn({
+          event: "PAYMENT_TOKEN_ENV_MISMATCH",
+          provider: MERCADOPAGO_PROVIDER_ID,
+          message: "MERCADOPAGO_ACCESS_TOKEN parece ser de teste (TEST-) em produção.",
+        });
+      }
+      return staticToken;
+    }
     throw new MercadoPagoError({
       kind: "unauthorized",
-      message: "Conta do Mercado Pago não conectada.",
+      message: sandbox
+        ? "Sandbox sem MERCADOPAGO_SANDBOX_ACCESS_TOKEN e sem conta conectada."
+        : "Conta do Mercado Pago não conectada.",
+    });
+  }
+
+  // A conta conectada precisa pertencer ao ambiente ativo.
+  if (sandbox && account.liveMode) {
+    throw new MercadoPagoError({
+      kind: "unauthorized",
+      message:
+        "A conta conectada é de produção, mas MERCADOPAGO_ENVIRONMENT=sandbox. Reconecte a conta ou defina MERCADOPAGO_SANDBOX_ACCESS_TOKEN.",
+    });
+  }
+  if (!sandbox && !account.liveMode) {
+    logger.warn({
+      event: "PAYMENT_TOKEN_ENV_MISMATCH",
+      provider: MERCADOPAGO_PROVIDER_ID,
+      message: "Conta de teste (sandbox) sendo usada em produção.",
     });
   }
 

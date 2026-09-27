@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  accessTokenMatchesEnvironment,
   isMercadoPagoSandbox,
   publicKeyMatchesEnvironment,
   resolveMercadoPagoEnvironment,
@@ -36,6 +37,22 @@ describe("publicKeyMatchesEnvironment", () => {
   it("chave ausente nunca corresponde", () => {
     expect(publicKeyMatchesEnvironment(null, "sandbox")).toBe(false);
     expect(publicKeyMatchesEnvironment("", "production")).toBe(false);
+  });
+});
+
+describe("accessTokenMatchesEnvironment", () => {
+  it("sandbox exige token TEST-", () => {
+    expect(accessTokenMatchesEnvironment("TEST-abc", "sandbox")).toBe(true);
+    expect(accessTokenMatchesEnvironment("APP_USR-abc", "sandbox")).toBe(false);
+  });
+
+  it("produção exige token APP_USR-", () => {
+    expect(accessTokenMatchesEnvironment("APP_USR-abc", "production")).toBe(true);
+    expect(accessTokenMatchesEnvironment("TEST-abc", "production")).toBe(false);
+  });
+
+  it("token ausente nunca corresponde", () => {
+    expect(accessTokenMatchesEnvironment(null, "sandbox")).toBe(false);
   });
 });
 

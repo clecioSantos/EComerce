@@ -24,6 +24,19 @@ export function publicKeyMatchesEnvironment(
   return environment === "sandbox" ? isTest : !isTest;
 }
 
+/**
+ * Tokens de acesso também são específicos do ambiente: sandbox usa `TEST-`,
+ * produção usa `APP_USR-`.
+ */
+export function accessTokenMatchesEnvironment(
+  accessToken: string | null | undefined,
+  environment: MercadoPagoEnvironment,
+): boolean {
+  if (!accessToken) return false;
+  const isTest = accessToken.startsWith("TEST-");
+  return environment === "sandbox" ? isTest : !isTest;
+}
+
 /** Seleciona a Public Key conforme o ambiente (fallback para a de produção). */
 export function selectMercadoPagoPublicKey(params: {
   environment: MercadoPagoEnvironment;
