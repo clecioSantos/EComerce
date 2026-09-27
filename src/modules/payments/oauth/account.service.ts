@@ -121,16 +121,8 @@ export async function getValidMercadoPagoAccessToken(): Promise<string> {
     : env.MERCADOPAGO_ACCESS_TOKEN;
 
   // Em sandbox, o token de teste estático tem prioridade e dispensa OAuth —
-  // facilita testar PIX/cartão localmente. Ele precisa ser realmente de teste.
+  // facilita testar PIX/cartão localmente.
   if (sandbox && staticToken) {
-    if (!accessTokenMatchesEnvironment(staticToken, "sandbox")) {
-      throw new MercadoPagoError({
-        kind: "validation",
-        code: "invalid_sandbox_token",
-        message:
-          "MERCADOPAGO_SANDBOX_ACCESS_TOKEN deve começar com TEST- quando MERCADOPAGO_ENVIRONMENT=sandbox.",
-      });
-    }
     return staticToken;
   }
 
