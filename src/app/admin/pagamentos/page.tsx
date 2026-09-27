@@ -35,6 +35,28 @@ export default async function AdminPaymentsPage({
   const env = getEnv();
   const account = await getMercadoPagoAccount();
 
+  const encryptionReady = Boolean(env.PAYMENT_TOKEN_ENCRYPTION_KEY);
+  const clientReady = Boolean(env.MERCADOPAGO_CLIENT_ID && env.MERCADOPAGO_CLIENT_SECRET);
+  const expectedRedirect = `${env.NEXT_PUBLIC_SITE_URL.replace(
+    /\/$/,
+    "",
+  )}/admin/pagamentos/oauth/callback`;
+  const redirectMatches = env.MERCADOPAGO_REDIRECT_URI === expectedRedirect;
+  const connectReady = encryptionReady && clientReady && redirectMatches;
+
+  const problems: string[] = [];
+  if (!clientReady) problems.push("Client ID/Secret não configurados.");
+  if (!encryptionReady) {
+    problems.push(
+      "PAYMENT_TOKEN_ENCRYPTION_KEY ausente — sem ela não é possível cifrar/guardar os tokens.",
+    );
+  }
+  if (!redirectMatches) {
+    problems.push(
+      `Redirect URI deve ser exatamente "${expectedRedirect}" e estar cadastrada no app do Mercado Pago.`,
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -52,8 +74,20 @@ export default async function AdminPaymentsPage({
       ) : null}
       {oauthStatus === "error" ? (
         <p className="border-destructive/40 bg-destructive/10 rounded-md border px-4 py-3 text-sm">
-          Não foi possível concluir a conexão. Verifique as credenciais e tente novamente.
+          Não foi possível concluir a conexão. Veja abaixo o que está faltando ou
+          incorreto antes de tentar novamente.
         </p>
+      ) : null}
+
+      {problems.length > 0 ? (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <p className="font-medium">Pendências para conectar:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {problems.map((problem) => (
+              <li key={problem}>{problem}</li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       <section className="bg-background space-y-4 rounded-lg border p-5">
@@ -64,6 +98,7 @@ export default async function AdminPaymentsPage({
           liveMode={account?.liveMode ?? false}
           expiresAt={account?.expiresAt?.toISOString() ?? null}
           hasRefreshToken={account?.hasRefreshToken ?? false}
+          connectDisabled={!connectReady}
         />
       </section>
 
@@ -71,7 +106,11 @@ export default async function AdminPaymentsPage({
         <h2 className="mb-3 text-sm font-semibold">Configuração</h2>
         <ConfigRow label="Client ID" ok={Boolean(env.MERCADOPAGO_CLIENT_ID)} />
         <ConfigRow label="Client Secret" ok={Boolean(env.MERCADOPAGO_CLIENT_SECRET)} />
-        <ConfigRow label="Redirect URI" ok={Boolean(env.MERCADOPAGO_REDIRECT_URI)} />
+        <ConfigRow
+          label="Redirect URI"
+          ok={redirectMatches}
+          hint={redirectMatches ? undefined : "deve apontar para esta loja"}
+        />
         <ConfigRow
           label="Webhook secret (x-signature)"
           ok={Boolean(env.MERCADOPAGO_WEBHOOK_SECRET)}
@@ -84,8 +123,13 @@ export default async function AdminPaymentsPage({
           label="Cifra de tokens"
           ok={Boolean(env.PAYMENT_TOKEN_ENCRYPTION_KEY)}
         />
-        <div className="text-muted-foreground mt-4 text-xs">
-          Webhook: <code>{env.NEXT_PUBLIC_SITE_URL}/api/webhooks/mercadopago</code>
+        <div className="text-muted-foreground mt-4 space-y-1 text-xs">
+          <div>
+            Redirect URI esperada: <code>{expectedRedirect}</code>
+          </div>
+          <div>
+            Webhook: <code>{env.NEXT_PUBLIC_SITE_URL}/api/webhooks/mercadopago</code>
+          </div>
         </div>
       </section>
 

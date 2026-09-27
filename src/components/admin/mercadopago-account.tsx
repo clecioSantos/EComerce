@@ -13,6 +13,7 @@ interface Props {
   liveMode: boolean;
   expiresAt: string | null;
   hasRefreshToken: boolean;
+  connectDisabled?: boolean;
 }
 
 export function MercadoPagoAccount({
@@ -21,6 +22,7 @@ export function MercadoPagoAccount({
   liveMode,
   expiresAt,
   hasRefreshToken,
+  connectDisabled = false,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -50,9 +52,18 @@ export function MercadoPagoAccount({
           Nenhuma conta conectada. Conecte a conta do Mercado Pago da loja para receber
           pagamentos via PIX e cartão.
         </p>
-        <Button render={<a href="/admin/pagamentos/oauth/connect" />}>
-          Conectar Mercado Pago
-        </Button>
+        {connectDisabled ? (
+          <p className="text-muted-foreground text-sm">
+            Resolva as pendências de configuração acima para habilitar a conexão.
+          </p>
+        ) : null}
+        {connectDisabled ? (
+          <Button disabled>Conectar Mercado Pago</Button>
+        ) : (
+          <Button render={<a href="/admin/pagamentos/oauth/connect" />}>
+            Conectar Mercado Pago
+          </Button>
+        )}
       </div>
     );
   }
