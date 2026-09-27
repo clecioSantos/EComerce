@@ -1,4 +1,5 @@
 import { getEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 import type {
   CreatePaymentInput,
@@ -11,7 +12,7 @@ import type {
 } from "../../types";
 import { getValidMercadoPagoAccessToken } from "../../oauth/account.service";
 import { MercadoPagoClient } from "./client";
-import { buildPaymentPayload, toPaymentIntent } from "./mapper";
+import { buildPaymentPayload, redactPaymentPayload, toPaymentIntent } from "./mapper";
 import { mapMercadoPagoStatus } from "./status";
 
 /**
@@ -43,10 +44,31 @@ export class MercadoPagoProvider implements PaymentProvider {
     )}/api/webhooks/mercadopago`;
 
     const payload = buildPaymentPayload(input, notificationUrl);
+
+    // Log do que é enviado ao Mercado Pago (sem token de cartão/CPF/e-mail).
+    logger.info({
+      event: "PAYMENT_MP_REQUEST",
+      endpoint: `${env.MERCADOPAGO_API_URL}/v1/payments`,
+      environment: env.MERCADOPAGO_ENVIRONMENT,
+      orderId: input.orderId,
+      method: input.method,
+      idempotencyKey: input.idempotencyKey ?? null,
+      payload: redactPaymentPayload(payload),
+    });
+
     const payment = await this.createClient(accessToken).createPayment(
       payload,
       input.idempotencyKey ?? undefined,
     );
+
+    logger.info({
+      event: "PAYMENT_MP_RESPONSE",
+      orderId: input.orderId,
+      providerPaymentId: String(payment.id),
+      status: payment.status,
+      statusDetail: payment.status_detail ?? null,
+      hasQrCode: Boolean(payment.point_of_interaction?.transaction_data?.qr_code),
+    });
 
     return toPaymentIntent(payment, input.method);
   }

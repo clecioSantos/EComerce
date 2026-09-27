@@ -4,6 +4,7 @@ import {
   buildPaymentPayload,
   inferPaymentMethod,
   normalizePayerEmail,
+  redactPaymentPayload,
   resolvePaymentMethodId,
   splitName,
   toPaymentIntent,
@@ -130,6 +131,27 @@ describe("toPaymentIntent", () => {
       statusDetail: "accredited",
       expiresAt: "2026-01-01T00:30:00.000-03:00",
     });
+  });
+});
+
+describe("redactPaymentPayload", () => {
+  it("redige token, CPF e e-mail sem alterar o restante", () => {
+    const redacted = redactPaymentPayload({
+      transaction_amount: 199.9,
+      token: "card-token-secret",
+      payer: {
+        email: "maria@exemplo.com",
+        first_name: "Maria",
+        identification: { type: "CPF", number: "12345678901" },
+      },
+    });
+
+    expect(redacted.transaction_amount).toBe(199.9);
+    expect(redacted.token).toBe("***token***");
+    const payer = redacted.payer as Record<string, unknown>;
+    expect(payer.email).toBe("ma***@exemplo.com");
+    expect(payer.first_name).toBe("Maria");
+    expect((payer.identification as Record<string, unknown>).number).toBe("***01");
   });
 });
 

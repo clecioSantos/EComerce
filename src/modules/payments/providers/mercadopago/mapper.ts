@@ -99,3 +99,41 @@ export function toPaymentIntent(
     raw: payment,
   };
 }
+
+function maskEmail(email: string): string {
+  const [user, domain] = email.split("@");
+  if (!domain || !user) return "***";
+  const visible = user.slice(0, 2);
+  return `${visible}***@${domain}`;
+}
+
+function maskDigits(value: string): string {
+  const last = value.slice(-2);
+  return `***${last}`;
+}
+
+/**
+ * Redige o payload antes de logar: nunca expõe o token do cartão, o CPF nem o
+ * e-mail completo do pagador. O restante permanece legível para depuração.
+ */
+export function redactPaymentPayload(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const clone =
+    typeof structuredClone === "function"
+      ? structuredClone(payload)
+      : (JSON.parse(JSON.stringify(payload)) as Record<string, unknown>);
+
+  if (typeof clone.token === "string") clone.token = "***token***";
+
+  const payer = clone.payer as Record<string, unknown> | undefined;
+  if (payer) {
+    if (typeof payer.email === "string") payer.email = maskEmail(payer.email);
+    const identification = payer.identification as Record<string, unknown> | undefined;
+    if (identification && typeof identification.number === "string") {
+      identification.number = maskDigits(identification.number);
+    }
+  }
+
+  return clone;
+}
