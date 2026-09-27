@@ -1,12 +1,28 @@
 import type { CreatePaymentInput, PaymentIntent, PaymentMethodKind } from "../../types";
+import { MercadoPagoError } from "./errors";
 import { mapMercadoPagoStatus } from "./status";
 import type { MercadoPagoPayment } from "./types";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function splitName(name: string): { firstName: string; lastName: string } {
   const trimmed = name.trim();
   if (!trimmed) return { firstName: "", lastName: "" };
   const [first, ...rest] = trimmed.split(/\s+/);
   return { firstName: first, lastName: rest.join(" ") };
+}
+
+/** Normaliza e valida o e-mail do pagador (o MP exige domínio com TLD). */
+export function normalizePayerEmail(value: string | null | undefined): string {
+  const email = (value ?? "").trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) {
+    throw new MercadoPagoError({
+      kind: "validation",
+      code: "invalid_payer_email",
+      message: "payer.email must be a valid email",
+    });
+  }
+  return email;
 }
 
 /** Define o `payment_method_id` conforme o método interno. */
@@ -32,7 +48,7 @@ export function buildPaymentPayload(
     payment_method_id: paymentMethodId,
     external_reference: input.orderId,
     payer: {
-      email: input.payer?.email ?? input.customer.email,
+      email: normalizePayerEmail(input.payer?.email ?? input.customer.email),
       first_name: (input.payer?.firstName ?? firstName) || undefined,
       last_name: (input.payer?.lastName ?? lastName) || undefined,
       identification: input.payer?.identification,

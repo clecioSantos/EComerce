@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPaymentPayload,
   inferPaymentMethod,
+  normalizePayerEmail,
   resolvePaymentMethodId,
   splitName,
   toPaymentIntent,
@@ -22,6 +23,18 @@ describe("splitName", () => {
     expect(splitName("Maria Souza")).toEqual({ firstName: "Maria", lastName: "Souza" });
     expect(splitName("Madonna")).toEqual({ firstName: "Madonna", lastName: "" });
     expect(splitName("  ")).toEqual({ firstName: "", lastName: "" });
+  });
+});
+
+describe("normalizePayerEmail", () => {
+  it("normaliza para minúsculas e remove espaços", () => {
+    expect(normalizePayerEmail("  Maria@Exemplo.COM ")).toBe("maria@exemplo.com");
+  });
+
+  it("rejeita e-mail sem TLD (que o MP recusa)", () => {
+    expect(() => normalizePayerEmail("nome@dominio")).toThrow(/valid email/);
+    expect(() => normalizePayerEmail("sem-arroba")).toThrow(/valid email/);
+    expect(() => normalizePayerEmail("")).toThrow(/valid email/);
   });
 });
 

@@ -4,7 +4,11 @@ import { prisma } from "@/lib/db/prisma";
 import { logger } from "@/lib/logger";
 import type { CartDTO } from "@/modules/cart/types";
 import { getActiveCart, mapCart } from "@/modules/cart/cart.service";
-import { confirmOrderPayment, createOrder } from "@/modules/orders/order.service";
+import {
+  cancelOrder,
+  confirmOrderPayment,
+  createOrder,
+} from "@/modules/orders/order.service";
 import type { CheckoutOrderInput } from "@/modules/orders/schemas";
 import {
   getLatestPaymentIntent,
@@ -268,9 +272,7 @@ export async function placeOrder(
         orderId: existing.id,
         orderNumber: existing.number,
         paymentStatus: latest?.payment.status ?? existing.paymentStatus,
-        payment: latest
-          ? toPaymentResult(latest.payment.id, latest.intent)
-          : null,
+        payment: latest ? toPaymentResult(latest.payment.id, latest.intent) : null,
       };
     }
   }
@@ -351,10 +353,19 @@ export async function placeOrder(
       : undefined,
     metadata: { orderNumber: order.number },
     idempotencyKey: input.idempotencyKey ?? null,
+  }).catch(async (error: unknown) => {
+    // Falha ao criar o pagamento (dados inválidos, indisponibilidade...):
+    // desfaz o pedido — libera o estoque reservado e não deixa a chave de
+    // idempotência "presa", permitindo nova tentativa.
+    await cancelOrder(order.id).catch(() => {});
+    throw error;
   });
 
   if (intent.status === "PAID") {
     await confirmOrderPayment(order.id);
+  } else if (intent.status === "FAILED" || intent.status === "CANCELED") {
+    // Cartão recusado: libera o estoque reservado (o carrinho é preservado).
+    await cancelOrder(order.id).catch(() => {});
   }
 
   return {

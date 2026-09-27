@@ -15,10 +15,23 @@ export const shippingAddressSchema = z.object({
   phone: z.string().max(30).optional().nullable(),
 });
 
+/**
+ * E-mail mais estrito que o padrão (exige domínio com TLD), pois o Mercado
+ * Pago rejeita endereços como `nome@dominio` com "payer.email must be a valid
+ * email".
+ */
+const payerEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value), {
+    message: "Informe um e-mail válido (ex.: nome@dominio.com).",
+  });
+
 export const checkoutOrderSchema = z.object({
   customer: z.object({
     name: z.string().min(2).max(120),
-    email: z.email(),
+    email: payerEmailSchema,
     phone: z.string().max(30).optional().nullable(),
   }),
   shippingAddress: shippingAddressSchema,

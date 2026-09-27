@@ -59,6 +59,9 @@ export function friendlyMercadoPagoMessage(error: unknown): string {
   if (!(error instanceof MercadoPagoError)) {
     return "Não foi possível processar o pagamento. Tente novamente.";
   }
+  if (error.code === "invalid_payer_email" || /payer\.email/i.test(error.message)) {
+    return "Informe um e-mail válido do comprador (ex.: nome@dominio.com).";
+  }
   switch (error.kind) {
     case "timeout":
       return "O Mercado Pago demorou para responder. Tente novamente.";

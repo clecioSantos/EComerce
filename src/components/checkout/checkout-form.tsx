@@ -117,7 +117,6 @@ export function CheckoutForm({
   const [pending, startTransition] = useTransition();
   const [coupon, setCoupon] = useState(couponCode ?? "");
   const [paymentMethod, setPaymentMethod] = useState<FormValues["paymentMethod"]>("PIX");
-  const [idempotencyKey] = useState(() => generateIdempotencyKey());
   const [options, setOptions] = useState<ShippingOption[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -296,6 +295,9 @@ export function CheckoutForm({
     }
 
     startTransition(async () => {
+      // Nova chave por tentativa: evita "envenenar" a chave após uma falha.
+      const idempotencyKey = generateIdempotencyKey();
+
       // Salva o novo endereço na conta, quando solicitado (não bloqueia o pedido).
       if (saveAddress && selectedAddressId === "new" && canSaveAddress) {
         const saved = await createAddressAction({
