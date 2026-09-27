@@ -3,6 +3,7 @@ import "server-only";
 import { getEnv } from "@/lib/env";
 
 import { MercadoPagoClient, requestOAuthToken } from "../providers/mercadopago/client";
+import { isMercadoPagoSandbox } from "../providers/mercadopago/environment";
 import { MercadoPagoError } from "../providers/mercadopago/errors";
 import { MERCADOPAGO_PROVIDER_ID, saveMercadoPagoTokens } from "./account.service";
 import { codeChallengeS256, consumeOAuthState, createOAuthState } from "./state";
@@ -68,6 +69,8 @@ export async function completeMercadoPagoOAuth(params: {
     grant_type: "authorization_code",
     code: params.code,
     redirect_uri: env.MERCADOPAGO_REDIRECT_URI,
+    // Em sandbox, solicita credenciais de teste (TEST-).
+    test_token: isMercadoPagoSandbox(env.MERCADOPAGO_ENVIRONMENT) ? "true" : "false",
     ...(consumed.codeVerifier ? { code_verifier: consumed.codeVerifier } : {}),
   });
 

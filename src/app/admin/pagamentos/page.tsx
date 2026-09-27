@@ -5,6 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getEnv } from "@/lib/env";
 import { getMercadoPagoAccount } from "@/modules/payments/oauth/account.service";
+import { hasStuckOAuthAttempt } from "@/modules/payments/oauth/state";
+import {
+  publicKeyMatchesEnvironment,
+  resolveMercadoPagoEnvironment,
+} from "@/modules/payments/providers/mercadopago/environment";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +39,8 @@ export default async function AdminPaymentsPage({
 
   const env = getEnv();
   const account = await getMercadoPagoAccount();
+  const stuckAttempt =
+    !account && (await hasStuckOAuthAttempt({ provider: "mercadopago" }));
 
   const encryptionReady = Boolean(env.PAYMENT_TOKEN_ENCRYPTION_KEY);
   const clientReady = Boolean(env.MERCADOPAGO_CLIENT_ID && env.MERCADOPAGO_CLIENT_SECRET);
@@ -43,6 +50,15 @@ export default async function AdminPaymentsPage({
   )}/admin/pagamentos/oauth/callback`;
   const redirectMatches = env.MERCADOPAGO_REDIRECT_URI === expectedRedirect;
   const connectReady = encryptionReady && clientReady && redirectMatches;
+
+  const environment = resolveMercadoPagoEnvironment(env.MERCADOPAGO_ENVIRONMENT);
+  const sandbox = environment === "sandbox";
+  const activePublicKey = sandbox
+    ? (process.env.NEXT_PUBLIC_MERCADOPAGO_SANDBOX_PUBLIC_KEY ??
+      process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ??
+      null)
+    : (process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? null);
+  const publicKeyOk = publicKeyMatchesEnvironment(activePublicKey, environment);
 
   const problems: string[] = [];
   if (!clientReady) problems.push("Client ID/Secret não configurados.");
@@ -61,9 +77,11 @@ export default async function AdminPaymentsPage({
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Pagamentos</h1>
-        <p className="text-muted-foreground text-sm">
-          Gateway ativo: <strong>{env.PAYMENT_PROVIDER}</strong>. Configure o Mercado Pago
-          para PIX e cartão.
+        <p className="text-muted-foreground flex items-center gap-2 text-sm">
+          Gateway ativo: <strong>{env.PAYMENT_PROVIDER}</strong>
+          <Badge variant={sandbox ? "secondary" : "default"}>
+            {sandbox ? "Sandbox (teste)" : "Produção"}
+          </Badge>
         </p>
       </div>
 
@@ -87,6 +105,17 @@ export default async function AdminPaymentsPage({
               <li key={problem}>{problem}</li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {stuckAttempt ? (
+        <div className="border-destructive/40 bg-destructive/10 rounded-md border px-4 py-3 text-sm">
+          <p className="font-medium">A tentativa de conexão não retornou a esta loja.</p>
+          <p className="mt-1">
+            O Mercado Pago redirecionou o <code>code</code> para outra URL. Confirme que a{" "}
+            <strong>Redirect URL</strong> cadastrada no app do Mercado Pago é exatamente{" "}
+            <code>{expectedRedirect}</code> e que ela é acessível a partir do navegador.
+          </p>
         </div>
       ) : null}
 
@@ -117,8 +146,20 @@ export default async function AdminPaymentsPage({
         />
         <ConfigRow
           label="Public key (browser)"
-          ok={Boolean(process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY)}
+          ok={publicKeyOk}
+          hint={
+            publicKeyOk
+              ? undefined
+              : `esperada uma chave ${sandbox ? "TEST-" : "APP_USR-"}`
+          }
         />
+        {sandbox ? (
+          <ConfigRow
+            label="Access token de teste"
+            ok={Boolean(env.MERCADOPAGO_SANDBOX_ACCESS_TOKEN)}
+            hint="TEST-…"
+          />
+        ) : null}
         <ConfigRow
           label="Cifra de tokens"
           ok={Boolean(env.PAYMENT_TOKEN_ENCRYPTION_KEY)}

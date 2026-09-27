@@ -6,6 +6,7 @@ import { getEnv } from "@/lib/env";
 import { logEvent } from "@/lib/logger";
 
 import { requestOAuthToken } from "../providers/mercadopago/client";
+import { isMercadoPagoSandbox } from "../providers/mercadopago/environment";
 import { MercadoPagoError } from "../providers/mercadopago/errors";
 
 export const MERCADOPAGO_PROVIDER_ID = "mercadopago";
@@ -107,7 +108,18 @@ export async function disconnectMercadoPago(): Promise<void> {
  * duas requisições concorrentes invalidem uma à outra.
  */
 export async function getValidMercadoPagoAccessToken(): Promise<string> {
-  const staticToken = getEnv().MERCADOPAGO_ACCESS_TOKEN;
+  const env = getEnv();
+
+  // Em sandbox, o token de teste estático tem prioridade e dispensa OAuth —
+  // facilita testar PIX/cartão localmente.
+  if (
+    isMercadoPagoSandbox(env.MERCADOPAGO_ENVIRONMENT) &&
+    env.MERCADOPAGO_SANDBOX_ACCESS_TOKEN
+  ) {
+    return env.MERCADOPAGO_SANDBOX_ACCESS_TOKEN;
+  }
+
+  const staticToken = env.MERCADOPAGO_ACCESS_TOKEN;
   const account = await prisma.paymentProviderAccount.findUnique({
     where: { provider: MERCADOPAGO_PROVIDER_ID },
   });

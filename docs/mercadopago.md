@@ -23,24 +23,54 @@ Cron GET /api/internal/reconcile-payments
 
 ## Variáveis de ambiente
 
-| Variável | Obrigatória | Descrição |
-| --- | --- | --- |
-| `PAYMENT_PROVIDER` | sim | Use `mercadopago` para o gateway real (`mock` em dev). |
-| `MERCADOPAGO_CLIENT_ID` | OAuth | App ID do aplicativo MP. |
-| `MERCADOPAGO_CLIENT_SECRET` | OAuth | Client secret — **somente server-side**. |
-| `MERCADOPAGO_REDIRECT_URI` | OAuth | Igual à "Redirect URL" do aplicativo. |
-| `MERCADOPAGO_ACCESS_TOKEN` | opcional | Token estático (loja única, sem OAuth). |
-| `MERCADOPAGO_WEBHOOK_SECRET` | sim | Segredo de assinatura (`x-signature`). |
-| `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY` | sim | Public Key (pode ir ao browser). |
-| `MERCADOPAGO_API_URL` | não | Default `https://api.mercadopago.com`. |
-| `MERCADOPAGO_AUTH_URL` | não | Default `https://auth.mercadopago.com`. |
-| `MERCADOPAGO_TIMEOUT_MS` | não | Default `20000`. |
-| `MERCADOPAGO_PKCE_ENABLED` | não | `true` se o app exigir PKCE. |
-| `MERCADOPAGO_WEBHOOK_DEBUG_BYPASS` | não | Bypass de assinatura **apenas** fora de produção. |
-| `PAYMENT_TOKEN_ENCRYPTION_KEY` | OAuth | Cifra dos tokens em repouso (AES-256-GCM). |
-| `CRON_SECRET` | reconciliação | Protege o endpoint de cron. |
+| Variável                                     | Obrigatória   | Descrição                                                                 |
+| -------------------------------------------- | ------------- | ------------------------------------------------------------------------- |
+| `PAYMENT_PROVIDER`                           | sim           | Use `mercadopago` para o gateway real (`mock` em dev).                    |
+| `MERCADOPAGO_CLIENT_ID`                      | OAuth         | App ID do aplicativo MP.                                                  |
+| `MERCADOPAGO_CLIENT_SECRET`                  | OAuth         | Client secret — **somente server-side**.                                  |
+| `MERCADOPAGO_REDIRECT_URI`                   | OAuth         | Igual à "Redirect URL" do aplicativo.                                     |
+| `MERCADOPAGO_ENVIRONMENT`                    | sim           | `sandbox` ou `production`. Controla `test_token` no OAuth e a Public Key. |
+| `MERCADOPAGO_ACCESS_TOKEN`                   | opcional      | Token estático (loja única, sem OAuth).                                   |
+| `MERCADOPAGO_SANDBOX_ACCESS_TOKEN`           | opcional      | Token de teste (`TEST-`); prioridade em sandbox, dispensa OAuth.          |
+| `MERCADOPAGO_WEBHOOK_SECRET`                 | sim           | Segredo de assinatura (`x-signature`).                                    |
+| `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY`         | sim           | Public Key de produção (pode ir ao browser).                              |
+| `NEXT_PUBLIC_MERCADOPAGO_SANDBOX_PUBLIC_KEY` | opcional      | Public Key de teste (`TEST-`), usada quando sandbox.                      |
+| `MERCADOPAGO_API_URL`                        | não           | Default `https://api.mercadopago.com`.                                    |
+| `MERCADOPAGO_AUTH_URL`                       | não           | Default `https://auth.mercadopago.com`.                                   |
+| `MERCADOPAGO_TIMEOUT_MS`                     | não           | Default `20000`.                                                          |
+| `MERCADOPAGO_PKCE_ENABLED`                   | não           | `true` se o app exigir PKCE.                                              |
+| `MERCADOPAGO_WEBHOOK_DEBUG_BYPASS`           | não           | Bypass de assinatura **apenas** fora de produção.                         |
+| `PAYMENT_TOKEN_ENCRYPTION_KEY`               | OAuth         | Cifra dos tokens em repouso (AES-256-GCM).                                |
+| `CRON_SECRET`                                | reconciliação | Protege o endpoint de cron.                                               |
 
 Gere a chave de cifra com `openssl rand -base64 32`.
+
+## Sandbox x Produção
+
+O comportamento é controlado por `MERCADOPAGO_ENVIRONMENT`:
+
+- `production` (padrão): usa credenciais reais (`APP_USR-`).
+- `sandbox`: usa credenciais de teste e facilita os testes:
+  - o OAuth envia `test_token: "true"` (credenciais `TEST-`);
+  - se `MERCADOPAGO_SANDBOX_ACCESS_TOKEN` estiver definido, ele tem prioridade
+    e **dispensa OAuth** para PIX/cartão;
+  - o checkout usa `NEXT_PUBLIC_MERCADOPAGO_SANDBOX_PUBLIC_KEY` (se definida) e
+    exibe um aviso de "Modo sandbox".
+
+Exemplo de `.env` para testes:
+
+```env
+MERCADOPAGO_ENVIRONMENT="sandbox"
+MERCADOPAGO_SANDBOX_ACCESS_TOKEN="TEST-xxxxxxxx-..."
+NEXT_PUBLIC_MERCADOPAGO_SANDBOX_PUBLIC_KEY="TEST-xxxxxxxx-..."
+```
+
+O painel **Admin → Pagamentos** mostra um selo do ambiente ativo e alerta quando
+a Public Key não corresponde (espera `TEST-` em sandbox, `APP_USR-` em produção).
+Reinicie o servidor após alterar o `.env`.
+
+> Para pagamentos de teste, use as [contas de teste](https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/accounts)
+> e os [cartões de teste](https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/cards).
 
 ## Configuração do aplicativo
 
@@ -63,7 +93,7 @@ Gere a chave de cifra com `openssl rand -base64 32`.
 Para desconectar: **Desconectar** em `/admin/pagamentos`.
 
 O access token é renovado automaticamente 5 minutos antes de expirar. A
-renovação usa um *lease* no banco (`refreshLockedUntil`) para evitar que duas
+renovação usa um _lease_ no banco (`refreshLockedUntil`) para evitar que duas
 requisições concorrentes invalidem o refresh token uma da outra.
 
 ## Pagamentos

@@ -7,6 +7,10 @@ import { getSession } from "@/lib/auth/dal";
 import { getEnv } from "@/lib/env";
 import { getCheckoutSummary } from "@/modules/checkout/checkout.service";
 import { listCustomerAddresses } from "@/modules/customers/customer.service";
+import {
+  resolveMercadoPagoEnvironment,
+  selectMercadoPagoPublicKey,
+} from "@/modules/payments/providers/mercadopago/environment";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +30,10 @@ export default async function CheckoutPage({
   const session = await getSession();
   const summary = await getCheckoutSummary(session?.user?.id, { couponCode });
   const addresses = session?.user?.id ? await listCustomerAddresses(session.user.id) : [];
+
+  const mercadoPagoEnvironment = resolveMercadoPagoEnvironment(
+    getEnv().MERCADOPAGO_ENVIRONMENT,
+  );
 
   if (!summary) {
     return (
@@ -58,7 +66,13 @@ export default async function CheckoutPage({
           email: session?.user?.email ?? "",
         }}
         paymentProvider={getEnv().PAYMENT_PROVIDER}
-        mercadoPagoPublicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? null}
+        mercadoPagoEnvironment={mercadoPagoEnvironment}
+        mercadoPagoPublicKey={selectMercadoPagoPublicKey({
+          environment: mercadoPagoEnvironment,
+          productionPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? null,
+          sandboxPublicKey:
+            process.env.NEXT_PUBLIC_MERCADOPAGO_SANDBOX_PUBLIC_KEY ?? null,
+        })}
       />
     </div>
   );

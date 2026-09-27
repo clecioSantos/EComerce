@@ -98,6 +98,7 @@ export function CheckoutForm({
   canSaveAddress,
   defaultCustomer,
   paymentProvider,
+  mercadoPagoEnvironment,
   mercadoPagoPublicKey,
 }: {
   cart: CartDTO;
@@ -108,6 +109,7 @@ export function CheckoutForm({
   canSaveAddress: boolean;
   defaultCustomer: { name: string; email: string };
   paymentProvider: string;
+  mercadoPagoEnvironment: "sandbox" | "production";
   mercadoPagoPublicKey: string | null;
 }) {
   const router = useRouter();
@@ -656,6 +658,12 @@ export function CheckoutForm({
                 nunca passam pela loja.
               </p>
             </div>
+          ) : null}
+
+          {paymentProvider === "mercadopago" && mercadoPagoEnvironment === "sandbox" ? (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              Modo sandbox do Mercado Pago ativo: use contas e cartões de teste.
+            </p>
           ) : null}
 
           <p className="text-muted-foreground text-xs">

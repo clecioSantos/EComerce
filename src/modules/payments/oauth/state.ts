@@ -71,3 +71,25 @@ export async function consumeOAuthState(params: {
   if (!row) return null;
   return { userId: row.userId, codeVerifier: row.codeVerifier };
 }
+
+/**
+ * Detecta uma tentativa de conexão "presa": um state válido (não expirado) que
+ * não foi consumido depois de alguns minutos — sinal de que o callback desta
+ * loja não foi atingido (Redirect URI divergente/inacessível).
+ */
+export async function hasStuckOAuthAttempt(params: {
+  provider: string;
+  olderThanMs?: number;
+}): Promise<boolean> {
+  const cutoff = new Date(Date.now() - (params.olderThanMs ?? 2 * 60 * 1000));
+  const row = await prisma.paymentOAuthState.findFirst({
+    where: {
+      provider: params.provider,
+      consumedAt: null,
+      expiresAt: { gt: new Date() },
+      createdAt: { lte: cutoff },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return Boolean(row);
+}

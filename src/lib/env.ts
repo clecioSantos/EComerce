@@ -22,6 +22,11 @@ const serverSchema = z.object({
   MERCADOPAGO_REDIRECT_URI: z.string().url().optional(),
   // Chave estática opcional (Client credentials). Se ausente, usa OAuth.
   MERCADOPAGO_ACCESS_TOKEN: z.string().min(1).optional(),
+  // Ambiente: "sandbox" usa credenciais de teste e `test_token` no OAuth.
+  MERCADOPAGO_ENVIRONMENT: z.enum(["sandbox", "production"]).default("production"),
+  // Token estático de teste (começa com TEST-). Tem prioridade em sandbox para
+  // facilitar testes de PIX/cartão sem conectar via OAuth.
+  MERCADOPAGO_SANDBOX_ACCESS_TOKEN: z.string().min(1).optional(),
   // Segredo de assinatura dos webhooks (x-signature). Server-side.
   MERCADOPAGO_WEBHOOK_SECRET: z.string().min(1).optional(),
   // URL base da API. Default produção; sandbox é o mesmo host.
