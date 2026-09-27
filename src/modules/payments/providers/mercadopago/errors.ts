@@ -10,6 +10,8 @@ export class MercadoPagoError extends Error {
   readonly status?: number;
   readonly code?: string;
   readonly details?: unknown;
+  /** Payload (redigido) enviado ao MP, anexado em falhas para depuração. */
+  requestPayload?: unknown;
 
   constructor(params: {
     kind: MercadoPagoErrorKind;

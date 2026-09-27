@@ -20,10 +20,8 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { PixPanel } from "@/components/checkout/pix-panel";
 import { formatCurrency } from "@/lib/format";
-import {
-  getMercadoPagoInstance,
-  getMercadoPagoPublicKey,
-} from "@/lib/mercadopago/client";
+import { getMercadoPagoInstance } from "@/lib/mercadopago/client";
+import { publicKeyMatchesEnvironment } from "@/modules/payments/providers/mercadopago/environment";
 import type { CartDTO } from "@/modules/cart/types";
 import { placeOrderAction } from "@/modules/checkout/checkout.actions";
 import { createAddressAction } from "@/modules/customers/address.actions";
@@ -246,10 +244,21 @@ export function CheckoutForm({
   }
 
   async function buildCardPayload() {
-    const publicKey = mercadoPagoPublicKey ?? getMercadoPagoPublicKey();
-    if (!publicKey) {
+    if (!mercadoPagoPublicKey) {
       toast.error("Pagamento com cartão indisponível no momento.");
       return undefined;
+    }
+    // Front (Public Key) e back (Access Token) precisam ser do MESMO ambiente,
+    // senão o MP responde "Unauthorized use of live credentials".
+    if (!publicKeyMatchesEnvironment(mercadoPagoPublicKey, mercadoPagoEnvironment)) {
+      console.warn(
+        "[pagamento] Public Key e ambiente divergem:",
+        {
+          environment: mercadoPagoEnvironment,
+          publicKeyPrefix: mercadoPagoPublicKey.slice(0, 9),
+        },
+        `esperado ${mercadoPagoEnvironment === "sandbox" ? "TEST-" : "APP_USR-"}`,
+      );
     }
     if (
       !card.number ||
@@ -263,7 +272,7 @@ export function CheckoutForm({
     }
 
     try {
-      const mp = await getMercadoPagoInstance(publicKey);
+      const mp = await getMercadoPagoInstance(mercadoPagoPublicKey);
       const token = await mp.createCardToken({
         cardNumber: onlyDigits(card.number),
         securityCode: card.cvv,
@@ -363,6 +372,12 @@ export function CheckoutForm({
 
       const result = await placeOrderAction(orderInput);
       console.info("[pagamento] resposta:", result);
+      if (result.payment?.mpRequest) {
+        console.info(
+          "[pagamento] payload enviado ao Mercado Pago:",
+          result.payment.mpRequest,
+        );
+      }
 
       if (result.ok && result.orderId) {
         const payment = result.payment;
@@ -452,8 +467,14 @@ export function CheckoutForm({
                 id="customerEmail"
                 type="email"
                 required
+                readOnly={canSaveAddress}
                 {...register("customerEmail")}
               />
+              {canSaveAddress ? (
+                <p className="text-muted-foreground text-xs">
+                  Usaremos o e-mail da sua conta para o pagamento.
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="customerPhone">Telefone</Label>

@@ -67,14 +67,14 @@ describe("selectMercadoPagoPublicKey", () => {
     ).toBe("TEST-sandbox");
   });
 
-  it("em sandbox faz fallback para a de produção se ausente", () => {
+  it("em sandbox NÃO cai para a chave de produção (evita mistura de ambiente)", () => {
     expect(
       selectMercadoPagoPublicKey({
         environment: "sandbox",
         productionPublicKey: "APP_USR-prod",
         sandboxPublicKey: null,
       }),
-    ).toBe("APP_USR-prod");
+    ).toBeNull();
   });
 
   it("em produção usa a de produção", () => {

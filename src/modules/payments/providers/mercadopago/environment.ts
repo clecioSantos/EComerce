@@ -37,7 +37,11 @@ export function accessTokenMatchesEnvironment(
   return environment === "sandbox" ? isTest : !isTest;
 }
 
-/** Seleciona a Public Key conforme o ambiente (fallback para a de produção). */
+/**
+ * Seleciona a Public Key conforme o ambiente. NÃO há fallback entre ambientes:
+ * usar a chave de produção em sandbox (ou o contrário) faz o card_token e o
+ * access token divergirem e o MP responde "Unauthorized use of live credentials".
+ */
 export function selectMercadoPagoPublicKey(params: {
   environment: MercadoPagoEnvironment;
   productionPublicKey?: string | null;
@@ -45,7 +49,7 @@ export function selectMercadoPagoPublicKey(params: {
 }): string | null {
   const { environment, productionPublicKey, sandboxPublicKey } = params;
   if (environment === "sandbox") {
-    return sandboxPublicKey ?? productionPublicKey ?? null;
+    return sandboxPublicKey ?? null;
   }
   return productionPublicKey ?? null;
 }

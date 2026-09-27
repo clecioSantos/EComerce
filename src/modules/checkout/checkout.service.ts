@@ -179,6 +179,8 @@ export interface PaymentResult {
   qrCodeBase64?: string;
   ticketUrl?: string;
   expiresAt?: string;
+  /** Payload (redigido) enviado ao Mercado Pago — para debug no navegador. */
+  mpRequest?: unknown;
 }
 
 export interface PlaceOrderResult {
@@ -199,6 +201,7 @@ function toPaymentResult(paymentId: string, intent: PaymentIntent): PaymentResul
     qrCodeBase64: intent.qrCodeBase64,
     ticketUrl: intent.ticketUrl,
     expiresAt: intent.expiresAt,
+    mpRequest: intent.requestPayload,
   };
 }
 
@@ -215,6 +218,21 @@ export async function placeOrder(
     destinationPostalCode: input.shippingAddress.postalCode,
   });
   if (!summary.selectedShipping) throw new Error("Selecione uma opção de frete.");
+
+  // O e-mail do pagador deve ser o do comprador autenticado (o mesmo do login),
+  // nunca um valor arbitrário vindo do formulário.
+  const user = userId
+    ? await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, name: true },
+      })
+    : null;
+
+  const customer = {
+    name: user?.name?.trim() || input.customer.name,
+    email: user?.email ?? input.customer.email,
+    phone: input.customer.phone ?? null,
+  };
 
   const discountById = new Map(
     summary.pricing.lines.map((line) => [line.id, line.discount]),
@@ -241,9 +259,9 @@ export async function placeOrder(
   const requestHash = computeRequestHash({
     userId: userId ?? null,
     customer: {
-      name: input.customer.name,
-      email: input.customer.email,
-      phone: input.customer.phone ?? null,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
     },
     shippingAddress: input.shippingAddress,
     shippingOptionId: selected.id,
@@ -279,11 +297,7 @@ export async function placeOrder(
 
   const order = await createOrder({
     userId: userId ?? null,
-    customer: {
-      name: input.customer.name,
-      email: input.customer.email,
-      phone: input.customer.phone ?? null,
-    },
+    customer,
     shippingAddress: input.shippingAddress,
     billingAddress: input.billingAddress ?? null,
     lines: orderLines,
@@ -339,7 +353,7 @@ export async function placeOrder(
     amount: summary.pricing.grandTotal,
     currency: context.cart.currency,
     method: input.paymentMethod as PaymentMethodKind,
-    customer: { name: input.customer.name, email: input.customer.email },
+    customer: { name: customer.name, email: customer.email },
     card: input.card
       ? {
           token: input.card.token,

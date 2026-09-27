@@ -24,6 +24,8 @@ export interface PlaceOrderActionResult {
     status?: number;
     code?: string;
     message?: string;
+    /** Payload (redigido) enviado ao Mercado Pago. */
+    payload?: unknown;
   };
 }
 
@@ -53,6 +55,7 @@ export async function placeOrderAction(
           status: error.status,
           code: error.code,
           message: error.message,
+          payload: error.requestPayload,
         },
       };
     }

@@ -12,6 +12,7 @@ import type {
 } from "../../types";
 import { getValidMercadoPagoAccessToken } from "../../oauth/account.service";
 import { MercadoPagoClient } from "./client";
+import { MercadoPagoError } from "./errors";
 import { buildPaymentPayload, redactPaymentPayload, toPaymentIntent } from "./mapper";
 import { mapMercadoPagoStatus } from "./status";
 
@@ -45,6 +46,8 @@ export class MercadoPagoProvider implements PaymentProvider {
 
     const payload = buildPaymentPayload(input, notificationUrl);
 
+    const redactedPayload = redactPaymentPayload(payload);
+
     // Log do que é enviado ao Mercado Pago (sem token de cartão/CPF/e-mail).
     logger.info({
       event: "PAYMENT_MP_REQUEST",
@@ -53,13 +56,18 @@ export class MercadoPagoProvider implements PaymentProvider {
       orderId: input.orderId,
       method: input.method,
       idempotencyKey: input.idempotencyKey ?? null,
-      payload: redactPaymentPayload(payload),
+      payload: redactedPayload,
     });
 
-    const payment = await this.createClient(accessToken).createPayment(
-      payload,
-      input.idempotencyKey ?? undefined,
-    );
+    const payment = await this.createClient(accessToken)
+      .createPayment(payload, input.idempotencyKey ?? undefined)
+      .catch((error: unknown) => {
+        // Anexa o payload redigido ao erro para depuração no navegador.
+        if (error instanceof MercadoPagoError) {
+          error.requestPayload = redactedPayload;
+        }
+        throw error;
+      });
 
     logger.info({
       event: "PAYMENT_MP_RESPONSE",
@@ -70,7 +78,9 @@ export class MercadoPagoProvider implements PaymentProvider {
       hasQrCode: Boolean(payment.point_of_interaction?.transaction_data?.qr_code),
     });
 
-    return toPaymentIntent(payment, input.method);
+    const intent = toPaymentIntent(payment, input.method);
+    intent.requestPayload = redactedPayload;
+    return intent;
   }
 
   async getPaymentStatus(providerPaymentId: string): Promise<PaymentIntent | null> {

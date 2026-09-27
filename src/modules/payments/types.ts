@@ -66,6 +66,8 @@ export interface PaymentIntent {
   /** Detalhe bruto do status do provedor (ex.: `accredited`). */
   statusDetail?: string;
   expiresAt?: string;
+  /** Payload (redigido) enviado ao provedor — para depuração no checkout. */
+  requestPayload?: unknown;
   raw?: unknown;
 }
 

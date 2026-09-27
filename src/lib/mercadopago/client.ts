@@ -1,10 +1,5 @@
 "use client";
 
-import {
-  resolveMercadoPagoEnvironment,
-  selectMercadoPagoPublicKey,
-} from "@/modules/payments/providers/mercadopago/environment";
-
 /**
  * Carrega o MercadoPago.js v2 (Core Methods) sob demanda e expõe apenas a
  * criação de token de cartão. Os dados sensíveis são tokenizados no browser e
@@ -67,18 +62,6 @@ function loadSdk(): Promise<MercadoPagoConstructor> {
   });
 
   return loader;
-}
-
-/** Public Key do ambiente ativo (sandbox usa `TEST-` quando configurada). */
-export function getMercadoPagoPublicKey(): string | null {
-  const environment = resolveMercadoPagoEnvironment(
-    process.env.NEXT_PUBLIC_MERCADOPAGO_ENVIRONMENT,
-  );
-  return selectMercadoPagoPublicKey({
-    environment,
-    productionPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? null,
-    sandboxPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_SANDBOX_PUBLIC_KEY ?? null,
-  });
 }
 
 export async function getMercadoPagoInstance(

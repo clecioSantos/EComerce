@@ -157,19 +157,25 @@ export async function getValidMercadoPagoAccessToken(): Promise<string> {
     });
   }
 
-  // A conta conectada precisa pertencer ao ambiente ativo.
-  if (sandbox && account.liveMode) {
-    throw new MercadoPagoError({
-      kind: "unauthorized",
-      message:
-        "A conta conectada é de produção, mas MERCADOPAGO_ENVIRONMENT=sandbox. Reconecte a conta ou defina MERCADOPAGO_SANDBOX_ACCESS_TOKEN.",
-    });
-  }
-  if (!sandbox && !account.liveMode) {
+  // A conta conectada precisa pertencer ao ambiente ativo; caso contrário,
+  // usamos o token estático do ambiente ou falhamos com erro claro.
+  const accountMismatch = sandbox ? account.liveMode : !account.liveMode;
+  if (accountMismatch) {
     logger.warn({
       event: "PAYMENT_TOKEN_ENV_MISMATCH",
       provider: MERCADOPAGO_PROVIDER_ID,
-      message: "Conta de teste (sandbox) sendo usada em produção.",
+      environment: sandbox ? "sandbox" : "production",
+      message: sandbox
+        ? "Conta conectada é de produção em ambiente sandbox."
+        : "Conta conectada é de teste em ambiente de produção.",
+    });
+    if (staticToken) return staticToken;
+    throw new MercadoPagoError({
+      kind: "unauthorized",
+      code: "account_environment_mismatch",
+      message: sandbox
+        ? "A conta conectada é de produção, mas o ambiente é sandbox. Reconecte a conta em sandbox ou defina MERCADOPAGO_SANDBOX_ACCESS_TOKEN (TEST-)."
+        : "A conta conectada é de teste, mas o ambiente é produção. Conecte a conta de produção ou defina MERCADOPAGO_ACCESS_TOKEN.",
     });
   }
 
