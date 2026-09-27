@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdmin } from "@/lib/auth/dal";
+import { getEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { MercadoPagoError } from "@/modules/payments/providers/mercadopago/errors";
 import { completeMercadoPagoOAuth } from "@/modules/payments/oauth/oauth.service";
@@ -9,8 +10,11 @@ export const dynamic = "force-dynamic";
 
 /** Callback do OAuth: valida o state, troca o code e persiste os tokens. */
 export async function GET(request: NextRequest) {
+  // Base pública configurada (atrás de proxy, `request.url` pode ser 0.0.0.0).
+  const baseUrl = getEnv().NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+
   const target = (status: string, reason?: string) => {
-    const url = new URL("/admin/pagamentos", request.url);
+    const url = new URL(`${baseUrl}/admin/pagamentos`);
     url.searchParams.set("oauth", status);
     if (reason) url.searchParams.set("reason", reason);
     return NextResponse.redirect(url);
@@ -22,7 +26,7 @@ export async function GET(request: NextRequest) {
     adminId = admin.id;
   } catch {
     return NextResponse.redirect(
-      new URL("/login?callbackUrl=/admin/pagamentos", request.url),
+      new URL(`${baseUrl}/login?callbackUrl=/admin/pagamentos`),
     );
   }
 
