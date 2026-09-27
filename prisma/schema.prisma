@@ -523,6 +523,8 @@ model Order {
   couponCode        String?
   idempotencyKey    String?       @unique
   requestHash       String?
+  // Carrinho de origem: só é esvaziado quando o pagamento é confirmado (PAID).
+  cartId            String?
   shippingAddress   Json
   billingAddress    Json?
   shippingProvider  String?
@@ -548,6 +550,7 @@ model Order {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([cartId])
   @@map("orders")
 }
 

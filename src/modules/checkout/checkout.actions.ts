@@ -18,6 +18,13 @@ export interface PlaceOrderActionResult {
   paymentStatus?: string;
   payment?: PaymentResult | null;
   error?: string;
+  /** Detalhe técnico (sem secrets) para depuração no console do navegador. */
+  detail?: {
+    kind?: string;
+    status?: number;
+    code?: string;
+    message?: string;
+  };
 }
 
 export async function placeOrderAction(
@@ -37,14 +44,22 @@ export async function placeOrderAction(
       payment: result.payment ?? null,
     };
   } catch (error) {
+    if (error instanceof MercadoPagoError) {
+      return {
+        ok: false,
+        error: friendlyMercadoPagoMessage(error),
+        detail: {
+          kind: error.kind,
+          status: error.status,
+          code: error.code,
+          message: error.message,
+        },
+      };
+    }
     return {
       ok: false,
       error:
-        error instanceof MercadoPagoError
-          ? friendlyMercadoPagoMessage(error)
-          : error instanceof Error
-            ? error.message
-            : "Não foi possível concluir o pedido.",
+        error instanceof Error ? error.message : "Não foi possível concluir o pedido.",
     };
   }
 }

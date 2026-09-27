@@ -5,7 +5,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { getEnv } from "@/lib/env";
 import { isUniqueConstraintError } from "@/lib/db/errors";
 import { prisma } from "@/lib/db/prisma";
-import { logEvent } from "@/lib/logger";
+import { logEvent, logger } from "@/lib/logger";
 import { getRequestId } from "@/lib/request-context";
 import { restockStock } from "@/modules/inventory/inventory.service";
 import { consumeOrderReservations } from "@/modules/orders/order.service";
@@ -172,6 +172,19 @@ export async function initiatePayment(input: InitiatePaymentInput) {
     if (claimed) {
       await prisma.payment.delete({ where: { id: claimed.id } }).catch(() => {});
     }
+    logger.error({
+      event: "PAYMENT_CREATE_FAILED",
+      orderId: input.orderId,
+      provider: provider.id,
+      method: input.method,
+      error: error instanceof Error ? error.message : String(error),
+      ...(error && typeof error === "object" && "code" in error
+        ? { code: (error as { code?: unknown }).code }
+        : {}),
+      ...(error && typeof error === "object" && "status" in error
+        ? { status: (error as { status?: unknown }).status }
+        : {}),
+    });
     throw error;
   }
 }

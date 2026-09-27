@@ -84,9 +84,7 @@ export function mapCart(cart: CartWithItems): CartDTO {
     };
   });
 
-  const subtotal = roundMoney(
-    items.reduce((total, item) => total + item.lineTotal, 0),
-  );
+  const subtotal = roundMoney(items.reduce((total, item) => total + item.lineTotal, 0));
 
   return {
     id: cart.id,
@@ -236,11 +234,22 @@ export async function clearCart(cartId: string) {
   return prisma.cartItem.deleteMany({ where: { cartId } });
 }
 
+/**
+ * Fecha o carrinho (esvazia itens e marca CONVERTED). Deve ser chamado APENAS
+ * quando o pagamento é confirmado, em transação. Idempotente.
+ */
+export async function closeCart(
+  db: Prisma.TransactionClient,
+  cartId: string,
+): Promise<void> {
+  await db.cartItem.deleteMany({ where: { cartId } });
+  await db.cart
+    .update({ where: { id: cartId }, data: { status: "CONVERTED" } })
+    .catch(() => {});
+}
+
 /** Migra itens de um carrinho convidado para o carrinho do usuário no login. */
-export async function mergeGuestCartIntoUserCart(
-  userId: string,
-  guestToken: string,
-) {
+export async function mergeGuestCartIntoUserCart(userId: string, guestToken: string) {
   const guestCart = await prisma.cart.findUnique({
     where: { sessionToken: guestToken },
     include: { items: true },

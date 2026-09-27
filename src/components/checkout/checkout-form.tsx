@@ -278,8 +278,13 @@ export function CheckoutForm({
           ? { type: card.docType, number: onlyDigits(card.docNumber) }
           : undefined,
       };
-    } catch {
-      toast.error("Não foi possível validar o cartão. Confira os dados.");
+    } catch (error) {
+      console.error("[pagamento] erro ao tokenizar cartão:", error);
+      toast.error(
+        error instanceof Error
+          ? `Cartão inválido: ${error.message}`
+          : "Não foi possível validar o cartão. Confira os dados.",
+      );
       return undefined;
     }
   }
@@ -347,23 +352,46 @@ export function CheckoutForm({
 
       if (result.ok && result.orderId) {
         const payment = result.payment;
+
+        if (payment && payment.status === "PAID") {
+          toast.success("Pagamento aprovado!");
+          router.push(`/checkout/sucesso?orderId=${result.orderId}`);
+          router.refresh();
+          return;
+        }
+
         if (
           payment &&
           (payment.status === "PENDING" || payment.status === "AUTHORIZED")
         ) {
-          toast.success("Pedido criado. Aguardando pagamento.");
+          toast.success(
+            payment.method === "PIX"
+              ? "Pedido criado. Pague o PIX para confirmar."
+              : "Pedido criado. Aguardando confirmação do pagamento.",
+          );
           setPaymentResult({
             orderId: result.orderId,
             orderNumber: result.orderNumber ?? "",
             payment,
           });
-          router.refresh();
+          // Não faz refresh: o carrinho é preservado até o pagamento confirmar.
           return;
         }
+
+        if (payment && (payment.status === "FAILED" || payment.status === "CANCELED")) {
+          console.error("[pagamento] pagamento recusado:", payment);
+          toast.error(
+            "Pagamento não aprovado. Seus itens continuam no carrinho — revise os dados e tente novamente.",
+          );
+          return;
+        }
+
+        // Sem detalhe de pagamento (ex.: provider mock já aprovado).
         toast.success("Pedido realizado!");
         router.push(`/checkout/sucesso?orderId=${result.orderId}`);
         router.refresh();
       } else {
+        console.error("[pagamento] erro ao finalizar:", result.error, result.detail);
         toast.error(result.error ?? "Não foi possível concluir o pedido.");
       }
     });

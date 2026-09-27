@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { isUniqueConstraintError } from "@/lib/db/errors";
 import { logEvent } from "@/lib/logger";
 import { getRequestId } from "@/lib/request-context";
+import { closeCart } from "@/modules/cart/cart.service";
 import {
   consumeStock,
   releaseStock,
@@ -103,6 +104,7 @@ export async function createOrder(input: CreateOrderInput) {
           couponCode: input.coupon?.code ?? null,
           idempotencyKey: input.idempotencyKey ?? null,
           requestHash: input.requestHash ?? null,
+          cartId: input.cartId ?? null,
           shippingAddress: input.shippingAddress as unknown as Prisma.InputJsonValue,
           billingAddress: (input.billingAddress ??
             undefined) as unknown as Prisma.InputJsonValue,
@@ -154,14 +156,9 @@ export async function createOrder(input: CreateOrderInput) {
         });
       }
 
-      // 4. Fechar o carrinho.
-      if (input.cartId) {
-        await tx.cartItem.deleteMany({ where: { cartId: input.cartId } });
-        await tx.cart.update({
-          where: { id: input.cartId },
-          data: { status: "CONVERTED" },
-        });
-      }
+      // 4. O carrinho NÃO é fechado aqui: só será esvaziado quando o pagamento
+      //    for confirmado (ver `consumeOrderReservations`). Assim, uma falha de
+      //    pagamento preserva os itens para o cliente tentar novamente.
 
       logEvent("ORDER_CREATED", {
         requestId,
@@ -226,6 +223,11 @@ export async function consumeOrderReservations(
     where: { id: orderId },
     data: { status: "PAID", paymentStatus: "PAID" },
   });
+
+  // Agora sim: pagamento confirmado → esvazia o carrinho de origem.
+  if (order.cartId) {
+    await closeCart(tx, order.cartId);
+  }
 
   logEvent("STOCK_CONSUMED", {
     requestId,
