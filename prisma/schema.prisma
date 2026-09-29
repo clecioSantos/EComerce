@@ -38,6 +38,7 @@ model User {
   couponUsages CouponUsage[]
   accounts     Account[]
   sessions     Session[]
+  savedCards   SavedCard[]
 
   @@map("users")
 }
@@ -692,10 +693,37 @@ model PaymentOAuthState {
   @@map("payment_oauth_states")
 }
 
+// Cartão salvo do cliente. O PAN NUNCA é armazenado aqui: o Mercado Pago
+// guarda o cartão (Customers & Cards API) e nós referenciamos o `card_id`.
+// O código de segurança (CVV) nunca é persistido.
+model SavedCard {
+  id                 String   @id @default(cuid())
+  userId             String
+  provider           String   @default("mercadopago")
+  providerCustomerId String
+  providerCardId     String
+  brand              String?
+  lastFourDigits     String
+  firstSixDigits     String?
+  expirationMonth    Int?
+  expirationYear     Int?
+  cardholderName     String?
+  paymentMethodId    String?
+  issuerId           String?
+  isDefault          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerCardId])
+  @@index([userId])
+  @@map("saved_cards")
+}
+
 // ---------------------------------------------------------------------------
 // Promoções e cupons
 // ---------------------------------------------------------------------------
-
 enum PromotionType {
   PERCENTAGE
   FIXED_AMOUNT

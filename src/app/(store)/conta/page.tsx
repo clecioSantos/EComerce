@@ -2,9 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AddressBook } from "@/components/account/address-book";
+import { CardList } from "@/components/account/card-list";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { getCurrentUser } from "@/lib/auth/dal";
+import { getEnv } from "@/lib/env";
+import { listSavedCards } from "@/modules/payments/cards.service";
+import {
+  resolveMercadoPagoEnvironment,
+  selectMercadoPagoPublicKey,
+} from "@/modules/payments/providers/mercadopago/environment";
 import { listCustomerAddresses } from "@/modules/customers/customer.service";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +26,14 @@ export default async function AccountPage() {
   if (!user) redirect("/login?callbackUrl=/conta");
 
   const addresses = await listCustomerAddresses(user.id);
+  const cards = await listSavedCards(user.id);
+
+  const environment = resolveMercadoPagoEnvironment(getEnv().MERCADOPAGO_ENVIRONMENT);
+  const mercadoPagoPublicKey = selectMercadoPagoPublicKey({
+    environment,
+    productionPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? null,
+    sandboxPublicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_SANDBOX_PUBLIC_KEY ?? null,
+  });
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
@@ -42,6 +57,10 @@ export default async function AccountPage() {
 
         <section className="rounded-lg border p-5">
           <AddressBook addresses={addresses} />
+        </section>
+
+        <section className="rounded-lg border p-5 md:col-span-2">
+          <CardList cards={cards} mercadoPagoPublicKey={mercadoPagoPublicKey} />
         </section>
       </div>
 

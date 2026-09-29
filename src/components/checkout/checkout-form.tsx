@@ -21,6 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { PixPanel } from "@/components/checkout/pix-panel";
 import { formatCurrency } from "@/lib/format";
 import { getMercadoPagoInstance } from "@/lib/mercadopago/client";
+import { saveCardAction } from "@/modules/payments/cards.actions";
+import type { SavedCardDTO } from "@/modules/payments/cards.service";
 import { publicKeyMatchesEnvironment } from "@/modules/payments/providers/mercadopago/environment";
 import type { CartDTO } from "@/modules/cart/types";
 import { placeOrderAction } from "@/modules/checkout/checkout.actions";
@@ -96,6 +98,7 @@ export function CheckoutForm({
   pricing,
   couponCode,
   addresses,
+  savedCards,
   canSaveAddress,
   defaultCustomer,
   paymentProvider,
@@ -107,6 +110,7 @@ export function CheckoutForm({
   pricing: PricingResult;
   couponCode: string | null;
   addresses: CustomerAddressDTO[];
+  savedCards: SavedCardDTO[];
   canSaveAddress: boolean;
   defaultCustomer: { name: string; email: string };
   paymentProvider: string;
@@ -129,6 +133,14 @@ export function CheckoutForm({
   );
   const [saveAddress, setSaveAddress] = useState(false);
   const [card, setCard] = useState<CardFormValues>(EMPTY_CARD);
+  const [selectedCardId, setSelectedCardId] = useState<string>(
+    savedCards.length > 0
+      ? (savedCards.find((item) => item.isDefault)?.id ?? savedCards[0].id)
+      : "new",
+  );
+  const [cardCvv, setCardCvv] = useState("");
+  const [saveNewCard, setSaveNewCard] = useState(false);
+  const selectedSavedCard = savedCards.find((item) => item.id === selectedCardId) ?? null;
   const [paymentResult, setPaymentResult] = useState<{
     orderId: string;
     orderNumber: string;
@@ -260,19 +272,38 @@ export function CheckoutForm({
         `esperado ${mercadoPagoEnvironment === "sandbox" ? "TEST-" : "APP_USR-"}`,
       );
     }
-    if (
-      !card.number ||
-      !card.cvv ||
-      !card.expiryMonth ||
-      !card.expiryYear ||
-      !card.holder
-    ) {
-      toast.error("Preencha os dados do cartão.");
-      return undefined;
-    }
+
+    const mp = await getMercadoPagoInstance(mercadoPagoPublicKey);
 
     try {
-      const mp = await getMercadoPagoInstance(mercadoPagoPublicKey);
+      // Cartão salvo: o cliente informa apenas o CVV.
+      if (selectedSavedCard) {
+        if (!cardCvv) {
+          toast.error("Informe o código de segurança (CVV).");
+          return undefined;
+        }
+        const token = await mp.createCardToken({
+          cardId: selectedSavedCard.providerCardId,
+          securityCode: cardCvv,
+        });
+        return {
+          token: token.id,
+          installments: Number(card.installments) || 1,
+          paymentMethodId: token.payment_method_id ?? "credit_card",
+        };
+      }
+
+      if (
+        !card.number ||
+        !card.cvv ||
+        !card.expiryMonth ||
+        !card.expiryYear ||
+        !card.holder
+      ) {
+        toast.error("Preencha os dados do cartão.");
+        return undefined;
+      }
+
       const token = await mp.createCardToken({
         cardNumber: onlyDigits(card.number),
         securityCode: card.cvv,
@@ -282,6 +313,29 @@ export function CheckoutForm({
         identificationType: card.docNumber ? card.docType : undefined,
         identificationNumber: card.docNumber ? onlyDigits(card.docNumber) : undefined,
       });
+
+      // "Salvar este cartão": salva com um token e paga com outro (tokens são
+      // de uso único). Depois o cartão fica disponível para próximas compras.
+      if (saveNewCard && canSaveAddress) {
+        const saved = await saveCardAction({
+          token: token.id,
+          setDefault: savedCards.length === 0,
+        });
+        if (!saved.ok || !saved.card) {
+          toast.error(saved.error ?? "Não foi possível salvar o cartão.");
+          return undefined;
+        }
+        const payToken = await mp.createCardToken({
+          cardId: saved.card.providerCardId,
+          securityCode: card.cvv,
+        });
+        return {
+          token: payToken.id,
+          installments: Number(card.installments) || 1,
+          paymentMethodId: payToken.payment_method_id ?? "credit_card",
+        };
+      }
+
       return {
         token: token.id,
         installments: Number(card.installments) || 1,
@@ -632,94 +686,176 @@ export function CheckoutForm({
           ) : null}
 
           {paymentProvider === "mercadopago" && paymentMethod === "CREDIT_CARD" ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="card-number">Número do cartão</Label>
-                <Input
-                  id="card-number"
-                  inputMode="numeric"
-                  autoComplete="cc-number"
-                  value={card.number}
-                  onChange={(event) => setCard({ ...card, number: event.target.value })}
-                />
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="card-holder">Nome impresso no cartão</Label>
-                <Input
-                  id="card-holder"
-                  autoComplete="cc-name"
-                  value={card.holder}
-                  onChange={(event) => setCard({ ...card, holder: event.target.value })}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="card-exp-month">Validade (MM/AA)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="card-exp-month"
-                    placeholder="MM"
-                    maxLength={2}
-                    value={card.expiryMonth}
-                    onChange={(event) =>
-                      setCard({ ...card, expiryMonth: event.target.value })
-                    }
-                  />
-                  <Input
-                    placeholder="AA"
-                    maxLength={2}
-                    value={card.expiryYear}
-                    onChange={(event) =>
-                      setCard({ ...card, expiryYear: event.target.value })
-                    }
-                  />
+            <div className="space-y-3">
+              {savedCards.length > 0 ? (
+                <div className="space-y-1">
+                  <Label>Cartão</Label>
+                  <Select
+                    value={selectedCardId}
+                    onValueChange={(value) => {
+                      if (value) setSelectedCardId(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-96">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">Novo cartão</SelectItem>
+                      {savedCards.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.brand ?? "Cartão"} •••• {item.lastFourDigits}
+                          {item.isDefault ? " (padrão)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="card-cvv">CVV</Label>
-                <Input
-                  id="card-cvv"
-                  inputMode="numeric"
-                  maxLength={4}
-                  autoComplete="cc-csc"
-                  value={card.cvv}
-                  onChange={(event) => setCard({ ...card, cvv: event.target.value })}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="card-installments">Parcelas</Label>
-                <Select
-                  value={card.installments}
-                  onValueChange={(value) => {
-                    if (value) setCard({ ...card, installments: value });
-                  }}
-                >
-                  <SelectTrigger id="card-installments" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[1, 2, 3, 4, 5, 6].map((count) => (
-                      <SelectItem key={count} value={String(count)}>
-                        {count}x
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="card-doc">CPF/CNPJ do titular</Label>
-                <Input
-                  id="card-doc"
-                  inputMode="numeric"
-                  value={card.docNumber}
-                  onChange={(event) =>
-                    setCard({ ...card, docNumber: event.target.value })
-                  }
-                />
-              </div>
-              <p className="text-muted-foreground text-xs sm:col-span-2">
-                Os dados do cartão são tokenizados pelo Mercado Pago no seu navegador e
-                nunca passam pela loja.
-              </p>
+              ) : null}
+
+              {selectedSavedCard ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="saved-card-cvv">CVV</Label>
+                    <Input
+                      id="saved-card-cvv"
+                      inputMode="numeric"
+                      maxLength={4}
+                      autoComplete="cc-csc"
+                      value={cardCvv}
+                      onChange={(event) => setCardCvv(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="card-installments">Parcelas</Label>
+                    <Select
+                      value={card.installments}
+                      onValueChange={(value) => {
+                        if (value) setCard({ ...card, installments: value });
+                      }}
+                    >
+                      <SelectTrigger id="card-installments" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6].map((count) => (
+                          <SelectItem key={count} value={String(count)}>
+                            {count}x
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-muted-foreground text-xs sm:col-span-2">
+                    Pedimos o CVV a cada compra por segurança. Ele não é armazenado.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label htmlFor="card-number">Número do cartão</Label>
+                    <Input
+                      id="card-number"
+                      inputMode="numeric"
+                      autoComplete="cc-number"
+                      value={card.number}
+                      onChange={(event) =>
+                        setCard({ ...card, number: event.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label htmlFor="card-holder">Nome impresso no cartão</Label>
+                    <Input
+                      id="card-holder"
+                      autoComplete="cc-name"
+                      value={card.holder}
+                      onChange={(event) =>
+                        setCard({ ...card, holder: event.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="card-exp-month">Validade (MM/AA)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="card-exp-month"
+                        placeholder="MM"
+                        maxLength={2}
+                        value={card.expiryMonth}
+                        onChange={(event) =>
+                          setCard({ ...card, expiryMonth: event.target.value })
+                        }
+                      />
+                      <Input
+                        placeholder="AA"
+                        maxLength={2}
+                        value={card.expiryYear}
+                        onChange={(event) =>
+                          setCard({ ...card, expiryYear: event.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="card-cvv">CVV</Label>
+                    <Input
+                      id="card-cvv"
+                      inputMode="numeric"
+                      maxLength={4}
+                      autoComplete="cc-csc"
+                      value={card.cvv}
+                      onChange={(event) => setCard({ ...card, cvv: event.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="card-installments">Parcelas</Label>
+                    <Select
+                      value={card.installments}
+                      onValueChange={(value) => {
+                        if (value) setCard({ ...card, installments: value });
+                      }}
+                    >
+                      <SelectTrigger id="card-installments" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6].map((count) => (
+                          <SelectItem key={count} value={String(count)}>
+                            {count}x
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="card-doc">CPF/CNPJ do titular</Label>
+                    <Input
+                      id="card-doc"
+                      inputMode="numeric"
+                      value={card.docNumber}
+                      onChange={(event) =>
+                        setCard({ ...card, docNumber: event.target.value })
+                      }
+                    />
+                  </div>
+                  {canSaveAddress ? (
+                    <div className="flex items-center gap-2 sm:col-span-2">
+                      <Checkbox
+                        id="save-card"
+                        checked={saveNewCard}
+                        onCheckedChange={(value) => setSaveNewCard(value === true)}
+                      />
+                      <Label htmlFor="save-card">
+                        Salvar este cartão para próximas compras
+                      </Label>
+                    </div>
+                  ) : null}
+                  <p className="text-muted-foreground text-xs sm:col-span-2">
+                    Os dados do cartão são tokenizados pelo Mercado Pago no seu navegador.
+                    O CVV nunca é armazenado.
+                  </p>
+                </div>
+              )}
             </div>
           ) : null}
 

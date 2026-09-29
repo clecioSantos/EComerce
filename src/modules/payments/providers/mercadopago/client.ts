@@ -1,5 +1,8 @@
 import { MercadoPagoError } from "./errors";
 import type {
+  MercadoPagoCard,
+  MercadoPagoCustomer,
+  MercadoPagoCustomerSearch,
   MercadoPagoOAuthTokenResponse,
   MercadoPagoPayment,
   MercadoPagoRefundResponse,
@@ -122,6 +125,41 @@ export class MercadoPagoClient {
 
   getMe(accessToken: string) {
     return this.request<MercadoPagoUser>("/users/me", { accessToken });
+  }
+
+  // --- Customers & Cards (Checkout Transparente) ---
+
+  createCustomer(body: Record<string, unknown>) {
+    return this.request<MercadoPagoCustomer>("/v1/customers", {
+      method: "POST",
+      body,
+    });
+  }
+
+  searchCustomers(email: string) {
+    return this.request<MercadoPagoCustomerSearch>(
+      `/v1/customers/search?email=${encodeURIComponent(email)}`,
+    );
+  }
+
+  saveCard(customerId: string, token: string) {
+    return this.request<MercadoPagoCard>(
+      `/v1/customers/${encodeURIComponent(customerId)}/cards`,
+      { method: "POST", body: { token } },
+    );
+  }
+
+  listCards(customerId: string) {
+    return this.request<MercadoPagoCard[]>(
+      `/v1/customers/${encodeURIComponent(customerId)}/cards`,
+    );
+  }
+
+  deleteCard(customerId: string, cardId: string) {
+    return this.request<unknown>(
+      `/v1/customers/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
+      { method: "DELETE" },
+    );
   }
 }
 

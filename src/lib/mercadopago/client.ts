@@ -6,13 +6,15 @@
  * nunca passam pela nossa API.
  */
 export interface CardTokenInput {
-  cardNumber: string;
-  securityCode: string;
-  expirationMonth: string;
-  expirationYear: string;
-  cardholderName: string;
+  cardNumber?: string;
+  securityCode?: string;
+  expirationMonth?: string;
+  expirationYear?: string;
+  cardholderName?: string;
   identificationType?: string;
   identificationNumber?: string;
+  /** Cartão salvo: gera token a partir do `card_id` + código de segurança. */
+  cardId?: string;
 }
 
 export interface CardToken {

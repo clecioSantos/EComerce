@@ -106,6 +106,26 @@ requisições concorrentes invalidem o refresh token uma da outra.
 O valor **sempre** é calculado no servidor a partir do pedido — o campo
 `amount` do frontend é ignorado.
 
+## Cartões salvos
+
+O cliente pode salvar cartões e reutilizá-los (como os endereços):
+
+- **Admin/Conta → Minha conta → Cartões salvos**: adicionar, remover e definir
+  o cartão padrão.
+- **Checkout**: se houver cartões salvos, o cliente escolhe um deles e informa
+  apenas o **CVV** (e as parcelas); ou usa "Novo cartão" com a opção de salvar.
+
+Segurança e modelagem:
+
+- O **PAN nunca passa pelo nosso backend**: o cartão é tokenizado no browser
+  (MercadoPago.js) e salvo no **Mercado Pago** via _Customers & Cards API_.
+- Guardamos apenas a referência (`providerCardId`) e metadados (bandeira,
+  últimos 4 dígitos, validade, titular) na tabela `saved_cards`.
+- O **CVV nunca é armazenado** e é pedido a cada pagamento (token gerado com
+  `card_id` + CVV).
+- Ao salvar um cartão durante o checkout, usamos dois tokens: um para salvar e
+  outro para pagar (os tokens do MP são de uso único).
+
 ## Webhook
 
 - `POST /api/webhooks/mercadopago`.

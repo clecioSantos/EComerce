@@ -43,3 +43,29 @@ export interface MercadoPagoRefundResponse {
   amount?: number;
   [key: string]: unknown;
 }
+
+export interface MercadoPagoCustomer {
+  id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  [key: string]: unknown;
+}
+
+export interface MercadoPagoCustomerSearch {
+  results?: MercadoPagoCustomer[];
+  paging?: unknown;
+}
+
+export interface MercadoPagoCard {
+  id: string;
+  customer_id?: string;
+  expiration_month?: number;
+  expiration_year?: number;
+  first_six_digits?: string;
+  last_four_digits?: string;
+  cardholder?: { name?: string; identification?: unknown } | null;
+  payment_method?: { id?: string; name?: string; thumbnail?: string } | null;
+  issuer?: { id?: number | string } | null;
+  [key: string]: unknown;
+}

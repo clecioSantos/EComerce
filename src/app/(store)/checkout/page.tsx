@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth/dal";
 import { getEnv } from "@/lib/env";
 import { getCheckoutSummary } from "@/modules/checkout/checkout.service";
 import { listCustomerAddresses } from "@/modules/customers/customer.service";
+import { listSavedCards } from "@/modules/payments/cards.service";
 import {
   resolveMercadoPagoEnvironment,
   selectMercadoPagoPublicKey,
@@ -30,6 +31,7 @@ export default async function CheckoutPage({
   const session = await getSession();
   const summary = await getCheckoutSummary(session?.user?.id, { couponCode });
   const addresses = session?.user?.id ? await listCustomerAddresses(session.user.id) : [];
+  const savedCards = session?.user?.id ? await listSavedCards(session.user.id) : [];
 
   const mercadoPagoEnvironment = resolveMercadoPagoEnvironment(
     getEnv().MERCADOPAGO_ENVIRONMENT,
@@ -60,6 +62,7 @@ export default async function CheckoutPage({
         pricing={summary.pricing}
         couponCode={summary.coupon?.code ?? null}
         addresses={addresses}
+        savedCards={savedCards}
         canSaveAddress={Boolean(session?.user?.id)}
         defaultCustomer={{
           name: session?.user?.name ?? "",
