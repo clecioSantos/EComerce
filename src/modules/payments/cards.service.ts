@@ -20,6 +20,8 @@ export interface SavedCardDTO {
   expirationMonth: number | null;
   expirationYear: number | null;
   cardholderName: string | null;
+  paymentMethodId: string | null;
+  issuerId: string | null;
   isDefault: boolean;
 }
 
@@ -32,6 +34,8 @@ function mapRow(card: SavedCard): SavedCardDTO {
     expirationMonth: card.expirationMonth,
     expirationYear: card.expirationYear,
     cardholderName: card.cardholderName,
+    paymentMethodId: card.paymentMethodId,
+    issuerId: card.issuerId,
     isDefault: card.isDefault,
   };
 }

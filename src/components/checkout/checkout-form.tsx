@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { PixPanel } from "@/components/checkout/pix-panel";
 import { formatCurrency } from "@/lib/format";
-import { getMercadoPagoInstance } from "@/lib/mercadopago/client";
+import { getMercadoPagoInstance, resolveCardBrand } from "@/lib/mercadopago/client";
 import { saveCardAction } from "@/modules/payments/cards.actions";
 import type { SavedCardDTO } from "@/modules/payments/cards.service";
 import { publicKeyMatchesEnvironment } from "@/modules/payments/providers/mercadopago/environment";
@@ -289,7 +289,8 @@ export function CheckoutForm({
         return {
           token: token.id,
           installments: Number(card.installments) || 1,
-          paymentMethodId: token.payment_method_id ?? "credit_card",
+          paymentMethodId: selectedSavedCard.paymentMethodId ?? token.payment_method_id,
+          issuerId: selectedSavedCard.issuerId ?? undefined,
         };
       }
 
@@ -314,6 +315,15 @@ export function CheckoutForm({
         identificationNumber: card.docNumber ? onlyDigits(card.docNumber) : undefined,
       });
 
+      // O `payment_method_id` deve ser a bandeira (visa/master/...), obtida pelo
+      // BIN (6 primeiros dígitos). "credit_card" é rejeitado pelo MP.
+      const brand = await resolveCardBrand(mp, token.first_six_digits);
+      const paymentMethodId = brand.paymentMethodId ?? token.payment_method_id;
+      if (!paymentMethodId) {
+        toast.error("Não foi possível identificar a bandeira do cartão.");
+        return undefined;
+      }
+
       // "Salvar este cartão": salva com um token e paga com outro (tokens são
       // de uso único). Depois o cartão fica disponível para próximas compras.
       if (saveNewCard && canSaveAddress) {
@@ -332,14 +342,16 @@ export function CheckoutForm({
         return {
           token: payToken.id,
           installments: Number(card.installments) || 1,
-          paymentMethodId: payToken.payment_method_id ?? "credit_card",
+          paymentMethodId: saved.card.paymentMethodId ?? paymentMethodId,
+          issuerId: saved.card.issuerId ?? brand.issuerId,
         };
       }
 
       return {
         token: token.id,
         installments: Number(card.installments) || 1,
-        paymentMethodId: token.payment_method_id ?? "credit_card",
+        paymentMethodId,
+        issuerId: brand.issuerId,
         identification: card.docNumber
           ? { type: card.docType, number: onlyDigits(card.docNumber) }
           : undefined,

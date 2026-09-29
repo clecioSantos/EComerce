@@ -20,10 +20,25 @@ export interface CardTokenInput {
 export interface CardToken {
   id: string;
   payment_method_id?: string;
+  first_six_digits?: string;
+  card_id?: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  issuers?: Array<{ id: string | number }>;
+}
+
+export interface ResolvedCardBrand {
+  paymentMethodId?: string;
+  issuerId?: string;
 }
 
 interface MercadoPagoInstance {
   createCardToken(input: CardTokenInput): Promise<CardToken>;
+  getPaymentMethods(params: {
+    bin: string;
+  }): Promise<PaymentMethod[] | { results?: PaymentMethod[] }>;
 }
 
 interface MercadoPagoConstructor {
@@ -75,4 +90,29 @@ export async function getMercadoPagoInstance(
   const instance = new MercadoPago(publicKey);
   instances.set(publicKey, instance);
   return instance;
+}
+
+/**
+ * Descobre a bandeira (`payment_method_id`, ex.: "visa") e o emissor a partir
+ * dos 6 primeiros dígitos. O `payment_method_id` genérico "credit_card" é
+ * rejeitado pelo MP na criação do pagamento.
+ */
+export async function resolveCardBrand(
+  mp: MercadoPagoInstance,
+  bin: string | undefined,
+): Promise<ResolvedCardBrand> {
+  if (!bin) return {};
+  try {
+    const response = await mp.getPaymentMethods({ bin });
+    const methods = Array.isArray(response) ? response : (response.results ?? []);
+    const method = methods[0];
+    if (!method?.id) return {};
+    const issuer = method.issuers?.[0]?.id;
+    return {
+      paymentMethodId: method.id,
+      issuerId: issuer != null ? String(issuer) : undefined,
+    };
+  } catch {
+    return {};
+  }
 }
