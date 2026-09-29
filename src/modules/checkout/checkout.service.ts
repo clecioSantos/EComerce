@@ -179,8 +179,10 @@ export interface PaymentResult {
   qrCodeBase64?: string;
   ticketUrl?: string;
   expiresAt?: string;
-  /** Payload (redigido) enviado ao Mercado Pago — para debug no navegador. */
+  /** Payload (completo) enviado ao Mercado Pago — para debug no navegador. */
   mpRequest?: unknown;
+  /** Resposta (completa) do Mercado Pago — para debug no navegador. */
+  mpResponse?: unknown;
 }
 
 export interface PlaceOrderResult {
@@ -202,6 +204,7 @@ function toPaymentResult(paymentId: string, intent: PaymentIntent): PaymentResul
     ticketUrl: intent.ticketUrl,
     expiresAt: intent.expiresAt,
     mpRequest: intent.requestPayload,
+    mpResponse: intent.raw,
   };
 }
 

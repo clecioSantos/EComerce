@@ -48,7 +48,7 @@ export class MercadoPagoProvider implements PaymentProvider {
 
     const redactedPayload = redactPaymentPayload(payload);
 
-    // Log do que é enviado ao Mercado Pago (sem token de cartão/CPF/e-mail).
+    // Log do que é enviado ao Mercado Pago (SERVER, sem token de cartão/CPF/e-mail).
     logger.info({
       event: "PAYMENT_MP_REQUEST",
       endpoint: `${env.MERCADOPAGO_API_URL}/v1/payments`,
@@ -62,9 +62,9 @@ export class MercadoPagoProvider implements PaymentProvider {
     const payment = await this.createClient(accessToken)
       .createPayment(payload, input.idempotencyKey ?? undefined)
       .catch((error: unknown) => {
-        // Anexa o payload redigido ao erro para depuração no navegador.
+        // Anexa o payload ao erro para depuração no navegador.
         if (error instanceof MercadoPagoError) {
-          error.requestPayload = redactedPayload;
+          error.requestPayload = payload;
         }
         throw error;
       });
@@ -79,7 +79,7 @@ export class MercadoPagoProvider implements PaymentProvider {
     });
 
     const intent = toPaymentIntent(payment, input.method);
-    intent.requestPayload = redactedPayload;
+    intent.requestPayload = payload;
     return intent;
   }
 

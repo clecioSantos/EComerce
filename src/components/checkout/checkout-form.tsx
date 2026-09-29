@@ -419,18 +419,18 @@ export function CheckoutForm({
         idempotencyKey,
       };
 
-      console.info("[pagamento] enviando pedido:", {
-        ...orderInput,
-        card: cardPayload ? { ...cardPayload, token: "***token***" } : null,
-      });
+      console.info("[pagamento] enviando pedido ao servidor:", orderInput);
 
       const result = await placeOrderAction(orderInput);
-      console.info("[pagamento] resposta:", result);
+      console.info("[pagamento] resposta do servidor:", result);
       if (result.payment?.mpRequest) {
         console.info(
           "[pagamento] payload enviado ao Mercado Pago:",
           result.payment.mpRequest,
         );
+      }
+      if (result.payment?.mpResponse) {
+        console.info("[pagamento] resposta do Mercado Pago:", result.payment.mpResponse);
       }
 
       if (result.ok && result.orderId) {
@@ -462,7 +462,12 @@ export function CheckoutForm({
         }
 
         if (payment && (payment.status === "FAILED" || payment.status === "CANCELED")) {
-          console.error("[pagamento] pagamento recusado:", payment);
+          console.error(
+            "[pagamento] pagamento recusado:",
+            payment,
+            "resposta do Mercado Pago:",
+            payment.mpResponse,
+          );
           toast.error(
             "Pagamento não aprovado. Seus itens continuam no carrinho — revise os dados e tente novamente.",
           );
@@ -474,7 +479,12 @@ export function CheckoutForm({
         router.push(`/checkout/sucesso?orderId=${result.orderId}`);
         router.refresh();
       } else {
-        console.error("[pagamento] erro ao finalizar:", result.error, result.detail);
+        console.error(
+          "[pagamento] erro ao finalizar:",
+          result.error,
+          "detalhe (inclui payload enviado):",
+          result.detail,
+        );
         toast.error(result.error ?? "Não foi possível concluir o pedido.");
       }
     });
