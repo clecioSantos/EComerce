@@ -38,7 +38,6 @@ export function StoreFooter({ appearance }: { appearance: AppearanceInput }) {
           <p className="mb-2 font-medium">Sua conta</p>
           <ul className="text-muted-foreground space-y-1">
             <li>
-            <li>
               <Link href="/login" className="hover:text-foreground">
                 Entrar
               </Link>
