@@ -211,9 +211,11 @@ export async function addItemToCart(params: {
 }) {
   const variant = await prisma.productVariant.findUnique({
     where: { id: params.variantId },
-    select: { id: true, productId: true },
+    select: { id: true, productId: true, product: { select: { storeId: true, status: true } } },
   });
-  if (!variant) throw new Error("Variante não encontrada.");
+  if (!variant || variant.product.status !== "ACTIVE") throw new Error("Variante não encontrada.");
+  const owningCart = await prisma.cart.findUnique({ where: { id: params.cartId }, select: { storeId: true, status: true } });
+  if (!owningCart || owningCart.status !== "ACTIVE" || owningCart.storeId !== variant.product.storeId) throw new Error("Produto não pertence à loja deste carrinho.");
 
   const existing = await prisma.cartItem.findUnique({
     where: { cartId_variantId: { cartId: params.cartId, variantId: params.variantId } },
