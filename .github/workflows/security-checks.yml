@@ -27,8 +27,23 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
       - run: node --check server.mjs
       - run: npx next typegen
+      - name: Verify embedded agent can be loaded by production Node runtime
+        run: node --import tsx --input-type=module -e "const agent = await import('./agent-service/src/server.ts'); if (!agent.handleAgentRequest || !agent.startAgentWorker) process.exit(1)"
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          MASTER_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          AGENT_ADMIN_PASSWORD: testing-agent-secret-1234
+          META_APP_SECRET: test-app-secret
+          META_VERIFY_TOKEN: test-verify-token
+          OPENAI_API_KEY: test-only-not-real
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
       - run: npm run typecheck
       - run: npm test
+      - name: Compile Next.js for the single-process deployment
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          AUTH_SECRET: testing-auth-secret-please-replace
   agent:
     name: Sales agent types and security tests
     runs-on: ubuntu-latest
