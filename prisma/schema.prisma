@@ -329,6 +329,7 @@ model Product {
   @@index([status, productTypeId])
   @@index([status, createdAt])
   @@map("products")
+  @@index([storeId])
 }
 
 model ProductImage {
@@ -503,6 +504,7 @@ model Cart {
 
   @@index([userId])
   @@map("carts")
+  @@index([storeId])
 }
 
 model CartItem {
@@ -607,6 +609,7 @@ model Order {
   @@index([createdAt])
   @@index([cartId])
   @@map("orders")
+  @@index([storeId])
 }
 
 model OrderItem {
