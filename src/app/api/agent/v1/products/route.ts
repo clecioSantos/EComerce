@@ -21,8 +21,8 @@ export async function GET(request: Request) {
         storeId,
         status: "ACTIVE",
         ...(q ? { OR: [
-          { name: { contains: q, mode: "insensitive" } },
-          { description: { contains: q, mode: "insensitive" } },
+          { name: { contains: q, mode: "insensitive" as const } },
+          { description: { contains: q, mode: "insensitive" as const } },
         ] } : {}),
       },
       include: productSummaryInclude,
