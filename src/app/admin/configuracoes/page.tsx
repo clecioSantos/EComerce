@@ -1,3 +1,5 @@
+import { AppearanceForm } from "@/components/admin/appearance-form";
+import { getStoreAppearance } from "@/modules/settings/appearance";
 import { StoreSettingsForm } from "@/components/admin/store-settings-form";
 import { listMelhorEnvioServices } from "@/modules/shipping/melhor-envio/services.service";
 import { getStoreSettings } from "@/modules/settings/store-settings.service";
@@ -7,8 +9,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Configurações" };
 
 export default async function AdminSettingsPage() {
-  const [settings, { services, source }] = await Promise.all([
+  const [settings, appearance, { services, source }] = await Promise.all([
     getStoreSettings(),
+    getStoreAppearance(),
     listMelhorEnvioServices(),
   ]);
 
@@ -17,9 +20,11 @@ export default async function AdminSettingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground text-sm">
-          Endereço de origem da loja e serviços de frete habilitados.
+          Personalize a marca, cores e endereço da loja sem alterar o código.
         </p>
       </div>
+
+      <AppearanceForm initial={appearance} />
 
       <StoreSettingsForm
         services={services}
