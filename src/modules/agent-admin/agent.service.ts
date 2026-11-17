@@ -16,8 +16,8 @@ const preferencesSchema = z.object({
 });
 export const agentSettingsSchema = z.object({
   enabled: z.boolean(),
-  phoneId: z.string().regex(/^\\d{6,25}$/).or(z.literal("")),
-  whatsappNumber: z.string().regex(/^\\d{8,16}$/).or(z.literal("")),
+  phoneId: z.string().regex(/^\d{6,25}$/).or(z.literal("")),
+  whatsappNumber: z.string().regex(/^\d{8,16}$/).or(z.literal("")),
   whatsappToken: z.string().max(4096).default(""),
   ...preferencesSchema.shape,
 });
