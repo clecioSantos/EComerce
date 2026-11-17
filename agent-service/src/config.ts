@@ -13,6 +13,7 @@ const schema = z.object({
  META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/),
  OPENAI_API_KEY: z.string().min(1),
  OPENAI_MODEL: z.string().min(1),
+ ALLOWED_COMMERCE_HOSTS: z.string().default(""),
  PUBLIC_BASE_URL: z.string().url(),
 });
 export const config = schema.parse(process.env);
