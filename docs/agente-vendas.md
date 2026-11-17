@@ -22,7 +22,7 @@ Esta branch é uma fundação incremental. Não representa isolamento multiloja 
 - Atualmente categorias, clientes, autenticação, configurações, pagamentos, promoções, cupons e outras entidades permanecem globais.
 - A vitrine, rotas do painel e serviços antigos ainda não filtram todos os acessos por loja.
 - Índices únicos de slug, SKU e outras chaves precisam ser revistos para escopo por loja.
-- O checkout gerado para um cliente já autenticado precisa de integração com o carrinho do usuário; por enquanto priorize os testes com clientes visitantes.
+- O handoff do checkout agora prioriza temporariamente o carrinho enviado pelo agente, inclusive para clientes logados. Ainda é necessário validar esse comportamento com testes de integração e E2E.
 - Falta criar um painel para provisionamento/revogação das chaves, auditoria e rate limits.
 - O serviço conversacional de IA e o conector WhatsApp serão outro projeto.
 
