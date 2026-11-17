@@ -11,7 +11,7 @@ export function CartButton({ count }: { count: number }) {
     <Button
       variant="ghost"
       size="icon"
-      className="relative"
+      className="relative shrink-0"
       render={<Link href="/carrinho" />}
     >
       <ShoppingBag className="size-5" />

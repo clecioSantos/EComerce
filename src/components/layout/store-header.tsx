@@ -33,20 +33,20 @@ export async function StoreHeader({
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90">
       <div className="h-1 w-full bg-primary" aria-hidden="true" />
-      <div className="mx-auto flex min-h-20 w-full max-w-7xl items-center gap-4 px-4 py-2 sm:min-h-24">
+      <div className="mx-auto flex min-h-20 w-full max-w-7xl items-center gap-2 px-3 py-2 sm:min-h-24 sm:gap-4 sm:px-4">
         <MobileMenu categories={categories} />
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" aria-label={appearance.name}>
+        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary md:flex-none md:gap-3" aria-label={appearance.name}>
           {appearance.logoUrl ? (
-            <img src={appearance.logoUrl} alt={`Logotipo de ${appearance.name}`} className="h-14 w-auto max-w-40 object-contain sm:h-16 sm:max-w-52" />
+            <img src={appearance.logoUrl} alt={`Logotipo de ${appearance.name}`} className="h-10 w-auto max-w-20 shrink object-contain sm:h-14 sm:max-w-36 lg:h-16 lg:max-w-52" />
           ) : (
-            <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary text-xl font-bold text-primary-foreground shadow-sm sm:size-14">
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground shadow-sm sm:size-14 sm:text-xl">
               {appearance.name.slice(0, 1).toUpperCase()}
             </span>
           )}
-          <span className="max-w-32 truncate text-base font-extrabold tracking-tight text-primary sm:max-w-56 sm:text-xl">{appearance.name}</span>
+          <span className="min-w-0 truncate text-sm font-extrabold tracking-tight text-primary sm:max-w-56 sm:text-xl">{appearance.name}</span>
         </Link>
         <SearchBar className="ml-4 hidden max-w-xl flex-1 md:block" />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-2">
           <CartButton count={cartCount} />
           <UserMenu user={user} />
         </div>

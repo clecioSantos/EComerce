@@ -27,9 +27,9 @@ export function UserMenu({ user }: { user: HeaderUser | null }) {
 
   if (!user) {
     return (
-      <Button variant="ghost" size="sm" render={<Link href="/login" />}>
-        <UserIcon className="mr-1 size-4" />
-        Entrar
+      <Button variant="ghost" size="sm" className="min-w-9 shrink-0 gap-1 px-2 sm:px-3" render={<Link href="/login" aria-label="Entrar na conta" />}>
+        <UserIcon className="size-5 sm:size-4" />
+        <span className="hidden sm:inline">Entrar</span>
       </Button>
     );
   }
