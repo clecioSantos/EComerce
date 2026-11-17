@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bot,
   Boxes,
   CreditCard,
   LayoutDashboard,
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/cupons", label: "Cupons", icon: Ticket },
   { href: "/admin/promocoes", label: "Promoções", icon: Percent },
+  { href: "/admin/agente", label: "Agente de vendas", icon: Bot },
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ];
 

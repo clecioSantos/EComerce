@@ -28,6 +28,7 @@ model Store {
   logoUrl String?
   primaryColor String @default("#202b35")
   accentColor String @default("#d7a66a")
+  agentServiceId String? @unique // Binding to the independent WhatsApp agent service
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
