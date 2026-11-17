@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS agent_stores (
  id UUID PRIMARY KEY, name TEXT NOT NULL, store_url TEXT NOT NULL,
- commerce_api_key_enc TEXT NOT NULL, whatsapp_phone_id TEXT NOT NULL UNIQUE,
- whatsapp_number TEXT NOT NULL, whatsapp_token_enc TEXT NOT NULL,
+ commerce_api_key_enc TEXT NOT NULL DEFAULT '', whatsapp_phone_id TEXT UNIQUE,
+ whatsapp_number TEXT NOT NULL DEFAULT '', whatsapp_token_enc TEXT NOT NULL DEFAULT '',
+ waba_id TEXT,
  enabled BOOLEAN NOT NULL DEFAULT false,
  preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -25,3 +26,6 @@ CREATE TABLE IF NOT EXISTS agent_inbound_events (
  next_attempt TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_error TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS agent_inbound_due_idx ON agent_inbound_events(state,next_attempt);
+
+CREATE TABLE IF NOT EXISTS agent_signup_states (id TEXT PRIMARY KEY, store_id UUID NOT NULL REFERENCES agent_stores(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL);
+CREATE INDEX IF NOT EXISTS agent_signup_states_expires_idx ON agent_signup_states(expires_at);
