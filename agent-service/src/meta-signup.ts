@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { config } from "./config.js";
-import { decrypt, encrypt } from "./security.js";
+import { encrypt } from "./security.js";
 import { pool, query, type Store } from "./db.js";
 
 type SignupState = { id: string; store_id: string; expires_at: Date };
@@ -21,13 +21,14 @@ export async function prepareSignup(storeId: string) {
  await query("INSERT INTO agent_signup_states(id,store_id,expires_at) VALUES($1,$2,now()+interval '10 minutes')",[state,storeId]);
  return { state, appId:config.META_APP_ID, configId:config.META_CONFIG_ID, graphVersion:config.META_GRAPH_VERSION };
 }
-export async function completeSignup(input:{state:string;code:string;wabaId:string;phoneId:string;pin?:string;coexistence?:boolean}) {
+export async function completeSignup(expectedStoreId:string,input:{state:string;code:string;wabaId:string;phoneId:string;pin?:string;coexistence?:boolean}) {
  if(!/^[a-f0-9]{64}$/.test(input.state)||!/^[A-Za-z0-9_\-]{4,2048}$/.test(input.code)||!/^[0-9]{6,25}$/.test(input.wabaId)||!/^[0-9]{6,25}$/.test(input.phoneId)) throw new Error("Invalid signup payload");
  const client=await pool.connect(); let state:SignupState;
  try {
   await client.query("BEGIN");
   const lock=await client.query<SignupState>("SELECT id,store_id,expires_at FROM agent_signup_states WHERE id=$1 FOR UPDATE",[input.state]);
   if(!lock.rows[0]||lock.rows[0].expires_at<=new Date()) { await client.query("ROLLBACK"); throw new Error("Expired or invalid signup state"); }
+  if(lock.rows[0].store_id!==expectedStoreId){await client.query("ROLLBACK");throw new Error("Signup state does not belong to this store");}
   state=lock.rows[0];
   await client.query("DELETE FROM agent_signup_states WHERE id=$1",[input.state]);
   await client.query("COMMIT");
