@@ -198,7 +198,8 @@ export async function saveAgentSettings(input: AgentSettingsInput) {
     try {
       const result = await remote<{ id: string }>("/stores", "POST", { ...payload, commerceKey: token });
       // Bind only after the service acknowledges the new store.
-      await prisma.store.update({ where: { id: store.id, agentServiceId: null }, data: { agentServiceId: result.id } });
+      const linked = await prisma.store.updateMany({ where: { id: store.id, agentServiceId: null }, data: { agentServiceId: result.id } });
+      if (linked.count !== 1) throw new Error("Agente já vinculado à loja; atualize a página antes de continuar.");
       return;
     } catch (error) {
       await prisma.agentApiCredential.update({
