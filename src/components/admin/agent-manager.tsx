@@ -47,6 +47,7 @@ export function AgentManager({ initial }: { initial: AgentState }) {
   const [state, setState] = useState(initial);
   const [form, setForm] = useState<AgentSettingsInput>(initial.settings);
   const [busy, setBusy] = useState(false);
+  const [metaReady, setMetaReady] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
@@ -100,7 +101,7 @@ export function AgentManager({ initial }: { initial: AgentState }) {
       setForm(prev => ({ ...prev, phoneId: current.phoneId ?? "", whatsappNumber: result.data.phoneNumber, enabled: true, whatsappToken: "" }));
       setState(prev => ({ ...prev, settings: { ...prev.settings, enabled: true, phoneId: current.phoneId ?? "", whatsappNumber: result.data.phoneNumber } }));
     } finally {
-      metaRef.current = null; metaCompletingRef.current = false; setBusy(false);
+      metaRef.current = null; metaCompletingRef.current = false; setBusy(false); setMetaReady(false);
     }
   }, []);
 
@@ -126,6 +127,7 @@ export function AgentManager({ initial }: { initial: AgentState }) {
       }
       if (p.event === "ERROR" || p.event === "CANCEL") {
         metaRef.current = null;
+        setMetaReady(false);
         setError("Cadastro interrompido ou cancelado pela Meta.");
       }
     }
@@ -134,27 +136,36 @@ export function AgentManager({ initial }: { initial: AgentState }) {
   }, [completeMeta]);
 
   async function connectMeta() {
-    setBusy(true); setNotice(""); setError("");
+    setBusy(true); setNotice(""); setError(""); setMetaReady(false);
     try {
       const result = await beginMetaSignupAction();
       if (!result.ok) { setError(result.error); return; }
       metaRef.current = result.data;
       await loadMetaSdk(result.data.appId, result.data.graphVersion);
-      setNotice("Conclua a conexão na janela da Meta.");
-      getFB().FB!.login(reply => {
-        if (!reply.authResponse?.code) {
-          setError("Autorização não concluída pela Meta.");
-          metaRef.current = null; return;
-        }
-        if (!metaRef.current || metaRef.current.state !== result.data.state) return;
-        metaRef.current = { ...metaRef.current, code: reply.authResponse.code };
-        void completeMeta();
-      }, {
-        config_id: result.data.configId, response_type: "code",
-        override_default_response_type: true, extras: { version: "v4", setup: {} },
-      });
+      setMetaReady(true);
+      setNotice("Meta preparada. Clique em Autorizar na Meta para abrir a janela de conexão.");
     } catch { setError("Não foi possível iniciar a conexão com a Meta."); metaRef.current = null; }
     finally { setBusy(false); }
+  }
+
+  function authorizeMeta() {
+    // Invoked immediately on a real click; prevents the browser from blocking the login popup.
+    const setup = metaRef.current;
+    if (!setup || !getFB().FB) { setError("Prepare novamente a conexão."); setMetaReady(false); return; }
+    setMetaReady(false);
+    setNotice("Conclua o cadastro na janela da Meta.");
+    getFB().FB!.login(reply => {
+      if (!reply.authResponse?.code) {
+        setError("Autorização não concluída pela Meta.");
+        metaRef.current = null; return;
+      }
+      if (!metaRef.current || metaRef.current.state !== setup.state) return;
+      metaRef.current = { ...metaRef.current, code: reply.authResponse.code };
+      void completeMeta();
+    }, {
+      config_id: setup.configId, response_type: "code",
+      override_default_response_type: true, extras: { version: "v4", setup: {} },
+    });
   }
 
   async function disconnect() {
@@ -248,7 +259,7 @@ export function AgentManager({ initial }: { initial: AgentState }) {
           </label>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={save} disabled={busy || !state.serviceAvailable}>{busy ? "Aguarde..." : state.connected ? "Salvar configurações" : "Cadastrar agente"}</Button>
-            <Button type="button" variant="outline" onClick={connectMeta} disabled={busy || !state.connected || !state.serviceAvailable}>Conectar pela Meta</Button>
+            <Button type="button" variant="outline" onClick={metaReady ? authorizeMeta : connectMeta} disabled={busy || !state.connected || !state.serviceAvailable}>{metaReady ? "Autorizar na Meta" : "Conectar pela Meta"}</Button>
             {state.connected ? <Button type="button" variant="ghost" onClick={disconnect} disabled={busy}>Desativar WhatsApp</Button> : null}
           </div>
           {!state.connected && <p className="text-xs text-muted-foreground">Primeiro cadastre o agente desativado. Depois conecte o WhatsApp pela Meta ou configure número, ID e token manualmente.</p>}
