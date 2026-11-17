@@ -388,6 +388,10 @@ async function createVariant(params: {
 }
 
 async function main() {
+  // Explicit opt-in prevents accidentally wiping real store data. Use scripts/refresh-fashion-demo.ts instead.
+  if (process.env.ALLOW_DESTRUCTIVE_SEED !== "I_UNDERSTAND_THIS_DELETES_DATA") {
+    throw new Error("Seed antigo destrutivo bloqueado: ele apaga pedidos, clientes e produtos. Para o catálogo de roupas use npm run catalog:fashion-demo -- --apply. Para reset de banco descartável, configure ALLOW_DESTRUCTIVE_SEED=I_UNDERSTAND_THIS_DELETES_DATA explicitamente.");
+  }
   console.log("Limpando dados existentes...");
   await reset();
 
