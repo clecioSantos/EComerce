@@ -80,7 +80,7 @@ async function run() {
     });
   }
   // Only deactivate obsolete root demo sections; retain rows and all past references.
-  await prisma.category.updateMany({ where: { slug: { in: ["moda","eletronicos","notebooks","celulares"] } }, data: { isActive: false } });
+  if (archiveLegacy) await prisma.category.updateMany({ where: { slug: { in: ["moda","eletronicos","notebooks","celulares"] } }, data: { isActive: false } });
   const valueId = async (attributeId: string, slug: string) => {
     const val = await prisma.productAttributeValue.findUnique({ where: { attributeId_slug: { attributeId, slug } } });
     if (!val) throw new Error(`Missing attribute value ${slug}`);
@@ -99,7 +99,9 @@ async function run() {
     const materialValue = await valueId(material.id, item.material);
     const genderValue = await valueId(gender.id, item.gender);
     const sizes = await Promise.all(["p","m","g","gg"].map(x=>valueId(size.id,x)));
-    const product = await prisma.product.create({
+    // All product, variant, image, assignment and stock records commit together.
+    await prisma.$transaction(async tx => {
+      const product = await tx.product.create({
       data: {
         storeId: store.id, name: item.name, slug: item.slug,
         status: "ACTIVE", productTypeId: clothing.id, categoryId: category.id,
@@ -119,7 +121,7 @@ async function run() {
     });
     for (let i=0; i<sizes.length; i++) {
       const sizeValue = sizes[i];
-      const v = await prisma.productVariant.create({
+      const v = await tx.productVariant.create({
         data: {
           productId: product.id, sku: item.slug.toUpperCase() + "-" + ["P","M","G","GG"][i],
           signature: variantSignature([colorValue, sizeValue]), price: item.price, position: i,
@@ -131,11 +133,12 @@ async function run() {
         },
         include: { inventory: true },
       });
-      if(v.inventory) await prisma.inventoryMovement.create({ data: {
+      if(v.inventory) await tx.inventoryMovement.create({ data: {
         inventoryId: v.inventory.id, variantId: v.id, type:"IN", quantity:8,
         reason: "Estoque demonstrativo da coleção " + catalog.collection,
       } });
     }
+    });
     created++;
   }
   let archived = 0;
