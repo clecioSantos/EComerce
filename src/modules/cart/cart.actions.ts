@@ -8,6 +8,7 @@ import {
   addItemToCart,
   clearCart,
   getOrCreateCart,
+  getActiveCart,
   removeCartItem,
   updateCartItemQuantity,
 } from "./cart.service";
@@ -63,6 +64,8 @@ export async function updateCartItemAction(input: {
 }): Promise<CartActionResult> {
   try {
     const parsed = updateCartItemSchema.parse(input);
+    const cart = await getActiveCart(await currentUserId());
+    if(!cart?.items.some(item => item.id === parsed.cartItemId)) throw new Error("Item não pertence ao seu carrinho.");
     await updateCartItemQuantity(parsed.cartItemId, parsed.quantity);
     revalidateCart();
     return { ok: true };
@@ -79,6 +82,8 @@ export async function removeCartItemAction(input: {
 }): Promise<CartActionResult> {
   try {
     const parsed = removeCartItemSchema.parse(input);
+    const cart = await getActiveCart(await currentUserId());
+    if(!cart?.items.some(item => item.id === parsed.cartItemId)) throw new Error("Item não pertence ao seu carrinho.");
     await removeCartItem(parsed.cartItemId);
     revalidateCart();
     return { ok: true };

@@ -19,6 +19,53 @@ enum Role {
   ADMIN
 }
 
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+  carts    Cart[]
+  orders   Order[]
+  agents   AgentApiCredential[]
+  checkoutLinks AgentCheckoutSession[]
+
+  @@map("stores")
+}
+
+// Keys are stored as one-way SHA-256 hashes; raw keys are never persisted.
+model AgentApiCredential {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  keyHash   String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  @@index([storeId])
+  @@map("agent_api_credentials")
+}
+
+model AgentCheckoutSession {
+  id         String   @id @default(cuid())
+  storeId    String
+  cartId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cart  Cart  @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  @@index([storeId, expiresAt])
+  @@map("agent_checkout_sessions")
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -245,6 +292,8 @@ model ProductAttributeAssignment {
 }
 
 model Product {
+  storeId          String        @default("legacy-store")
+  store            Store         @relation(fields: [storeId], references: [id])
   id               String        @id @default(cuid())
   name             String
   slug             String        @unique
@@ -280,6 +329,7 @@ model Product {
   @@index([status, productTypeId])
   @@index([status, createdAt])
   @@map("products")
+  @@index([storeId])
 }
 
 model ProductImage {
@@ -438,6 +488,8 @@ enum CartStatus {
 }
 
 model Cart {
+  storeId      String     @default("legacy-store")
+  store        Store      @relation(fields: [storeId], references: [id])
   id           String     @id @default(cuid())
   userId       String?
   sessionToken String?    @unique
@@ -448,9 +500,11 @@ model Cart {
 
   user  User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   items CartItem[]
+  checkoutLinks AgentCheckoutSession[]
 
   @@index([userId])
   @@map("carts")
+  @@index([storeId])
 }
 
 model CartItem {
@@ -506,6 +560,8 @@ enum PaymentMethod {
 }
 
 model Order {
+  storeId           String        @default("legacy-store")
+  store             Store         @relation(fields: [storeId], references: [id])
   id                String        @id @default(cuid())
   number            String        @unique
   userId            String?
@@ -553,6 +609,7 @@ model Order {
   @@index([createdAt])
   @@index([cartId])
   @@map("orders")
+  @@index([storeId])
 }
 
 model OrderItem {

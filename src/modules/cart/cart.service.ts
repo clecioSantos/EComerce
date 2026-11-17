@@ -99,7 +99,25 @@ export async function readCartToken(): Promise<string | undefined> {
   return (await cookies()).get(CART_COOKIE)?.value;
 }
 
+/** A transfer from the sales agent has its own short-lived, cookie-bound cart.
+ * Prefer it during checkout even if the shopper is signed in.
+ */
+async function getAgentHandoffCart() {
+  const token = await readCartToken();
+  if (!token) return null;
+  return prisma.cart.findFirst({
+    where: {
+      sessionToken: token,
+      status: "ACTIVE",
+      checkoutLinks: { some: { usedAt: { not: null } } },
+    },
+    include: cartInclude,
+  });
+}
+
 export async function getActiveCart(userId?: string | null) {
+  const agentCart = await getAgentHandoffCart();
+  if (agentCart) return agentCart;
   if (userId) {
     return prisma.cart.findFirst({
       where: { userId, status: "ACTIVE" },
@@ -148,6 +166,8 @@ export async function getOrCreateUserCart(userId: string) {
  * do convidado — só pode ser chamado em Server Action ou Route Handler.
  */
 export async function getOrCreateCart(userId?: string | null) {
+  const agentCart = await getAgentHandoffCart();
+  if (agentCart) return agentCart;
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -191,9 +211,11 @@ export async function addItemToCart(params: {
 }) {
   const variant = await prisma.productVariant.findUnique({
     where: { id: params.variantId },
-    select: { id: true, productId: true },
+    select: { id: true, productId: true, product: { select: { storeId: true, status: true } } },
   });
-  if (!variant) throw new Error("Variante não encontrada.");
+  if (!variant || variant.product.status !== "ACTIVE") throw new Error("Variante não encontrada.");
+  const owningCart = await prisma.cart.findUnique({ where: { id: params.cartId }, select: { storeId: true, status: true } });
+  if (!owningCart || owningCart.status !== "ACTIVE" || owningCart.storeId !== variant.product.storeId) throw new Error("Produto não pertence à loja deste carrinho.");
 
   const existing = await prisma.cartItem.findUnique({
     where: { cartId_variantId: { cartId: params.cartId, variantId: params.variantId } },
