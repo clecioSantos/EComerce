@@ -131,16 +131,30 @@ function publicSettings(store: RemoteStore): AgentSettingsInput {
 
 export async function getAgentState(): Promise<AgentState> {
   const store = await ownStore();
-  const configured = remoteConfig() !== null;
-  if (!configured) return { connected: false, serviceAvailable: false, configured, settings: defaults, storeName: store.name,
-    reason: "Configure AGENT_SERVICE_URL e AGENT_ADMIN_PASSWORD na Hostinger e implante o serviço independente." };
+  const fallback = { connected: Boolean(store.agentServiceId), settings: defaults, storeName: store.name };
   try {
-    if (!store.agentServiceId) return { connected: false, serviceAvailable: true, configured, settings: defaults, storeName: store.name };
-    const remoteStore = await ownRemoteStore(store.agentServiceId);
-    return { connected: true, serviceAvailable: true, configured, settings: publicSettings(remoteStore), storeName: store.name };
+    const configured = remoteConfig() !== null;
+    if (!configured) return {
+      ...fallback, configured: false, serviceAvailable: false,
+      reason: "Configure AGENT_SERVICE_URL e AGENT_ADMIN_PASSWORD na Hostinger e implante o serviço independente.",
+    };
+    // Also check the remote before displaying an enabled setup button.
+    const available = await remote<{ stores: RemoteStore[] }>("/stores");
+    if (!store.agentServiceId) return { ...fallback, configured: true, serviceAvailable: true };
+    const remoteStore = available.stores.find(item => item.id === store.agentServiceId);
+    if (!remoteStore) return {
+      ...fallback, configured: true, serviceAvailable: false,
+      reason: "O cadastro vinculado não foi encontrado no serviço de agentes. Verifique o banco do agente.",
+    };
+    return {
+      connected: true, configured: true, serviceAvailable: true,
+      settings: publicSettings(remoteStore), storeName: store.name,
+    };
   } catch {
-    return { connected: Boolean(store.agentServiceId), serviceAvailable: false, configured, settings: defaults, storeName: store.name,
-      reason: "Não foi possível acessar o serviço do agente. Verifique a URL, senha e estado do processo." };
+    return {
+      ...fallback, configured: true, serviceAvailable: false,
+      reason: "Não foi possível acessar o serviço do agente. Verifique a URL, senha e estado do processo.",
+    };
   }
 }
 
