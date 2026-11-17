@@ -20,9 +20,9 @@ export default async function AdminLayout({
   if (user.role !== "ADMIN") redirect("/");
 
   return (
-    <div className="min-h-screen md:flex">
+    <div className="min-h-screen bg-[#f6f7f8] md:flex">
       <AdminSidebar />
-      <main className="bg-muted/20 flex-1 p-4 md:p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 md:p-8 lg:p-10">{children}</main>
     </div>
   );
 }
