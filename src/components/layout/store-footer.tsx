@@ -6,16 +6,23 @@ export function StoreFooter({ appearance }: { appearance: AppearanceInput }) {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-muted/40 border-t">
+    <footer className="border-t-4 border-primary bg-primary/[0.055]">
       <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-10 sm:grid-cols-3">
         <div>
-          <p className="text-base font-semibold">{siteName}</p>
+          <div className="mb-3 flex items-center gap-3">
+            {appearance.logoUrl ? (
+              <img src={appearance.logoUrl} alt={`Logotipo de ${siteName}`} className="h-12 w-auto max-w-36 object-contain" />
+            ) : (
+              <span className="flex size-10 items-center justify-center rounded-md bg-primary font-bold text-primary-foreground">{siteName.slice(0, 1).toUpperCase()}</span>
+            )}
+            <p className="text-lg font-bold tracking-tight text-primary">{siteName}</p>
+          </div>
           <p className="text-muted-foreground mt-2 text-sm">
             {appearance.tagline}
           </p>
         </div>
         <div className="text-sm">
-          <p className="mb-2 font-medium">Atendimento</p>
+          <p className="mb-2 font-bold text-primary">Atendimento</p>
           <ul className="text-muted-foreground space-y-1">
             <li>
               <Link href="/produtos" className="hover:text-foreground">
@@ -35,7 +42,7 @@ export function StoreFooter({ appearance }: { appearance: AppearanceInput }) {
           </ul>
         </div>
         <div className="text-sm">
-          <p className="mb-2 font-medium">Sua conta</p>
+          <p className="mb-2 font-bold text-primary">Sua conta</p>
           <ul className="text-muted-foreground space-y-1">
             <li>
               <Link href="/login" className="hover:text-foreground">
@@ -50,7 +57,7 @@ export function StoreFooter({ appearance }: { appearance: AppearanceInput }) {
           </ul>
         </div>
       </div>
-      <div className="text-muted-foreground border-t px-4 py-4 text-center text-xs">
+      <div className="border-t border-primary/15 px-4 py-4 text-center text-xs text-muted-foreground">
         © {year} {siteName}. Todos os direitos reservados.
       </div>
     </footer>

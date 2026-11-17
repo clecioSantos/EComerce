@@ -31,38 +31,39 @@ export async function StoreHeader({
 
 
   return (
-    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 w-full border-b backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4">
+    <header className="sticky top-0 z-40 w-full border-b bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90">
+      <div className="h-1 w-full bg-primary" aria-hidden="true" />
+      <div className="mx-auto flex min-h-20 w-full max-w-7xl items-center gap-4 px-4 py-2 sm:min-h-24">
         <MobileMenu categories={categories} />
-        <Link href="/" className="flex min-w-0 items-center gap-2.5 text-lg font-semibold tracking-tight" aria-label={appearance.name}>
-          {appearance.logoUrl ? <img src={appearance.logoUrl} alt="" className="h-9 w-auto max-w-32 object-contain" /> : <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-sm bg-primary text-sm font-bold text-primary-foreground">{appearance.name.slice(0, 1).toUpperCase()}</span>}
-          <span className="max-w-36 truncate sm:max-w-56">{appearance.name}</span>
+        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" aria-label={appearance.name}>
+          {appearance.logoUrl ? (
+            <img src={appearance.logoUrl} alt={`Logotipo de ${appearance.name}`} className="h-14 w-auto max-w-40 object-contain sm:h-16 sm:max-w-52" />
+          ) : (
+            <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary text-xl font-bold text-primary-foreground shadow-sm sm:size-14">
+              {appearance.name.slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <span className="max-w-32 truncate text-base font-extrabold tracking-tight text-primary sm:max-w-56 sm:text-xl">{appearance.name}</span>
         </Link>
-        <SearchBar className="ml-2 hidden max-w-md flex-1 md:block" />
-        <div className="ml-auto flex items-center gap-1">
+        <SearchBar className="ml-4 hidden max-w-xl flex-1 md:block" />
+        <div className="ml-auto flex items-center gap-2">
           <CartButton count={cartCount} />
           <UserMenu user={user} />
         </div>
       </div>
 
-      <div className="mx-auto hidden w-full max-w-7xl items-center gap-5 px-4 pb-2 md:flex">
-        <Link
-          href="/produtos"
-          className="text-muted-foreground hover:text-foreground text-sm font-medium"
-        >
-          Catálogo
-        </Link>
-        {categories.map((category) => (
-          <Link
-            key={category.slug}
-            href={`/categorias/${category.slug}`}
-            className="text-muted-foreground hover:text-foreground text-sm font-medium"
-          >
-            {category.name}
+      <div className="border-t border-primary/10 bg-primary/[0.055]">
+        <nav aria-label="Categorias da loja" className="mx-auto hidden min-h-11 w-full max-w-7xl items-center gap-6 overflow-x-auto px-4 md:flex">
+          <Link href="/produtos" className="border-b-2 border-primary py-3 text-sm font-bold text-primary">
+            Catálogo
           </Link>
-        ))}
+          {categories.map(category => (
+            <Link key={category.slug} href={`/categorias/${category.slug}`} className="whitespace-nowrap py-3 text-sm font-medium text-foreground/75 transition-colors hover:text-primary">
+              {category.name}
+            </Link>
+          ))}
+        </nav>
       </div>
-
       <div className="px-4 pb-3 md:hidden">
         <SearchBar />
       </div>

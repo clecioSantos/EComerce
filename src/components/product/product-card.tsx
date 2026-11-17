@@ -10,8 +10,8 @@ export function ProductCard({ product }: { product: ProductSummaryDTO }) {
     product.compareAtPrice != null && product.compareAtPrice > product.basePrice;
 
   return (
-    <Link href={`/produtos/${product.slug}`} className="group block rounded-sm outline-offset-4 focus-visible:outline-2 focus-visible:outline-primary">
-      <div className="bg-muted relative aspect-square overflow-hidden rounded-sm">
+    <Link href={`/produtos/${product.slug}`} className="group block rounded-xl outline-offset-4 focus-visible:outline-2 focus-visible:outline-primary">
+      <div className="bg-muted relative aspect-square overflow-hidden rounded-xl border border-primary/10 transition-colors group-hover:border-primary/40">
         {product.image ? (
           <Image
             src={product.image}
@@ -26,7 +26,7 @@ export function ProductCard({ product }: { product: ProductSummaryDTO }) {
           </div>
         )}
         {hasDiscount ? (
-          <Badge className="absolute top-2 left-2">Oferta</Badge>
+          <Badge className="absolute top-3 left-3 border-0 bg-[var(--brand-accent)] font-bold text-[var(--brand-accent-foreground)]">Oferta</Badge>
         ) : null}
         {!product.inStock ? (
           <Badge variant="secondary" className="absolute top-2 right-2">
@@ -34,11 +34,11 @@ export function ProductCard({ product }: { product: ProductSummaryDTO }) {
           </Badge>
         ) : null}
       </div>
-      <div className="space-y-1.5 pt-3">
+      <div className="space-y-1.5 border-b-2 border-transparent pt-3 pb-3 transition-colors group-hover:border-primary">
         {product.categoryName ? (
           <p className="text-muted-foreground text-xs">{product.categoryName}</p>
         ) : null}
-        <h3 className="line-clamp-2 text-sm font-medium">{product.name}</h3>
+        <h3 className="line-clamp-2 text-sm font-semibold transition-colors group-hover:text-primary">{product.name}</h3>
         <Price
           value={product.basePrice}
           compareAt={product.compareAtPrice}
