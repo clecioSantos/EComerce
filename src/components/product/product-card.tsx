@@ -10,15 +10,15 @@ export function ProductCard({ product }: { product: ProductSummaryDTO }) {
     product.compareAtPrice != null && product.compareAtPrice > product.basePrice;
 
   return (
-    <Link href={`/produtos/${product.slug}`} className="group block">
-      <div className="bg-muted relative aspect-square overflow-hidden rounded-lg">
+    <Link href={`/produtos/${product.slug}`} className="group block rounded-sm outline-offset-4 focus-visible:outline-2 focus-visible:outline-primary">
+      <div className="bg-muted relative aspect-square overflow-hidden rounded-sm">
         {product.image ? (
           <Image
             src={product.image}
             alt={product.name}
             fill
             sizes="(max-width: 768px) 50vw, 25vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.035]"
           />
         ) : (
           <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
@@ -34,7 +34,7 @@ export function ProductCard({ product }: { product: ProductSummaryDTO }) {
           </Badge>
         ) : null}
       </div>
-      <div className="space-y-1 pt-3">
+      <div className="space-y-1.5 pt-3">
         {product.categoryName ? (
           <p className="text-muted-foreground text-xs">{product.categoryName}</p>
         ) : null}
