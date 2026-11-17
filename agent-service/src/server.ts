@@ -7,6 +7,7 @@ import { renderDashboard } from "./dashboard.js";
 import { respond } from "./ai.js";
 import { sendText, transcribeAudio } from "./whatsapp.js";
 import { prepareSignup, completeSignup, disconnectSignup } from "./meta-signup.js";
+import { validateCommerceUrl } from "./commerce-security.js";
 
 type Json = Record<string, unknown>;
 const storeInputs = (o:Json) => ({
@@ -20,12 +21,12 @@ const storeInputs = (o:Json) => ({
  preferences: typeof o.preferences==="object"&&o.preferences&&!Array.isArray(o.preferences)?o.preferences as Json:{},
 });
 function ensureStoreInput(x: ReturnType<typeof storeInputs>, creating:boolean) {
- const url=new URL(x.storeUrl);
+ const url=validateCommerceUrl(x.storeUrl);
  if (!["https:","http:"].includes(url.protocol) ||
      (url.protocol==="http:" && url.hostname!=="localhost")) throw Error("Informe URL HTTPS da loja.");
  if (!x.name || (x.phoneId && !/^\d{6,25}$/.test(x.phoneId)) || (x.whatsappNumber && !/^\d{8,16}$/.test(x.whatsappNumber))) throw Error("Nome ou identificação do WhatsApp inválidos.");
  if (creating&&!x.commerceKey)throw Error("A chave da API comercial é obrigatória no cadastro.");
- if (x.enabled && (!x.phoneId || !x.whatsappNumber || !x.whatsappToken)) throw Error("Conecte ou configure o WhatsApp antes de ativar.");
+ if (creating && x.enabled && (!x.phoneId || !x.whatsappNumber || !x.whatsappToken)) throw Error("Conecte ou configure o WhatsApp antes de ativar.");
  if (x.preferences.instructions && String(x.preferences.instructions).length>1500)throw Error("Orientações muito extensas.");
  if (x.preferences.tone && String(x.preferences.tone).length>100)throw Error("Tom inválido.");
  if (!["true","false"].includes(String(x.enabled)))throw Error("Status inválido.");
@@ -83,6 +84,7 @@ async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
    await query("INSERT INTO agent_stores(id,name,store_url,whatsapp_phone_id,whatsapp_number,enabled,preferences,commerce_api_key_enc,whatsapp_token_enc) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
     [id,...values,encrypt(input.commerceKey),input.whatsappToken?encrypt(input.whatsappToken):""]);
   }else{
+   if(input.enabled){const [old]=await query<Store>("SELECT * FROM agent_stores WHERE id=$1",[id]);if(!old||!(input.phoneId||old.whatsapp_phone_id)||!(input.whatsappNumber||old.whatsapp_number)||!(input.whatsappToken||old.whatsapp_token_enc))throw Error("Conecte o WhatsApp antes de ativar.");}
    const r=await pool.query("UPDATE agent_stores SET name=$2,store_url=$3,whatsapp_phone_id=$4,whatsapp_number=$5,enabled=$6,preferences=$7,commerce_api_key_enc=COALESCE($8,commerce_api_key_enc),whatsapp_token_enc=COALESCE($9,whatsapp_token_enc),updated_at=now() WHERE id=$1",
     [id,...values,input.commerceKey?encrypt(input.commerceKey):null,input.whatsappToken?encrypt(input.whatsappToken):null]);
    if(!r.rowCount)return responseError(res,404,"Loja não encontrada");
