@@ -82,7 +82,7 @@ async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
       emojis:input.preferences.emojis!==false,upsell:input.preferences.upsell!==false})];
   if(creating){
    await query("INSERT INTO agent_stores(id,name,store_url,whatsapp_phone_id,whatsapp_number,enabled,preferences,commerce_api_key_enc,whatsapp_token_enc) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-    [id,...values,encrypt(input.commerceKey),input.whatsappToken?encrypt(input.whatsappToken):""]);
+    [id,input.name,input.storeUrl,input.phoneId||null,input.whatsappNumber,input.enabled,values[5],encrypt(input.commerceKey),input.whatsappToken?encrypt(input.whatsappToken):""]);
   }else{
    if(input.enabled){const [old]=await query<Store>("SELECT * FROM agent_stores WHERE id=$1",[id]);if(!old||!(input.phoneId||old.whatsapp_phone_id)||!(input.whatsappNumber||old.whatsapp_number)||!(input.whatsappToken||old.whatsapp_token_enc))throw Error("Conecte o WhatsApp antes de ativar.");}
    const r=await pool.query("UPDATE agent_stores SET name=$2,store_url=$3,whatsapp_phone_id=$4,whatsapp_number=$5,enabled=$6,preferences=$7,commerce_api_key_enc=COALESCE($8,commerce_api_key_enc),whatsapp_token_enc=COALESCE($9,whatsapp_token_enc),updated_at=now() WHERE id=$1",
