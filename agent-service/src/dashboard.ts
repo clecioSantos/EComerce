@@ -33,7 +33,7 @@ export function renderDashboard() {
  <label>Orientações de venda / personalidade</label><textarea name="instructions" maxlength="1500" placeholder="Ex.: trate o cliente por você, não insista após uma recusa, destaque produtos nacionais..."></textarea>
  <label><input name="emojis" type="checkbox" style="width:auto" checked> Permitir emojis discretos</label>
  <label><input name="upsell" type="checkbox" style="width:auto" checked> Sugerir complementos quando fizer sentido</label>
- <button type="submit">Salvar configurações</button><p id="result" role="status" class="muted"></p></form>
+ <button type="submit">Salvar configurações</button><button type="button" id="connectMeta" class="secondary">Conectar WhatsApp pela Meta</button><button type="button" id="disconnectMeta" class="secondary">Desativar conexão</button><p id="result" role="status" class="muted"></p></form>
  </section>
  <section class="full"><h2>Atendimentos</h2><div class="flex"><div><label>Loja</label><select id="conversationStore"></select></div><div><button id="refresh" type="button" class="secondary">Atualizar</button></div></div><div class="flex"><div id="conversationList"></div><div id="messages" style="min-height:100px"></div></div></section></main>
  <script>
@@ -84,6 +84,63 @@ export function renderDashboard() {
   for(const m of r.messages){const div=document.createElement('div');div.className='bubble '+m.role;div.textContent=(m.role==='user'?'Cliente: ':'Agente: ')+m.text;$('messages').append(div);}
  }
  $('refresh').onclick=loadConversations;$('conversationStore').onchange=loadConversations;
+
+ let metaState=null,metaInfo=null,metaCode=null;
+ function resetMeta(){metaState=null;metaInfo=null;metaCode=null;}
+ function isMetaOrigin(origin){try{const u=new URL(origin);return u.protocol==='https:'&&(u.hostname==='facebook.com'||u.hostname.endsWith('.facebook.com'));}catch{return false;}}
+ window.addEventListener('message',e=>{
+  if(!isMetaOrigin(e.origin))return;
+  let payload=e.data;try{if(typeof payload==='string')payload=JSON.parse(payload);}catch{return;}
+  if(!payload||payload.type!=='WA_EMBEDDED_SIGNUP')return;
+  if(payload.event==='FINISH'||payload.event==='FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'){
+   metaInfo={wabaId:String(payload.data?.waba_id||''),phoneId:String(payload.data?.phone_number_id||''),coexistence:payload.event==='FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'};
+   void finishMeta();
+  }else if(payload.event==='CANCEL'||payload.event==='ERROR'){
+   $('result').textContent='Cadastro cancelado ou interrompido pela Meta.';resetMeta();
+  }
+ });
+ function loadMetaSDK(appId,version){
+  return new Promise((resolve,reject)=>{
+   if(window.FB){window.FB.init({appId,xfbml:false,version,cookie:false});return resolve();}
+   window.fbAsyncInit=()=>{window.FB.init({appId,xfbml:false,version,cookie:false});resolve();};
+   const script=document.createElement('script');script.src='https://connect.facebook.net/pt_BR/sdk.js';script.async=true;
+   script.onerror=()=>reject(Error('Não foi possível carregar a Meta.'));document.head.append(script);
+  });
+ }
+ async function finishMeta(){
+  if(!metaCode||!metaInfo||!metaState||!selected)return;
+  if(metaInfo.wabaId.length<6||metaInfo.phoneId.length<6)return;
+  const id=selected,params={state:metaState,code:metaCode,wabaId:metaInfo.wabaId,phoneId:metaInfo.phoneId,coexistence:metaInfo.coexistence};
+  if(!metaInfo.coexistence){
+   const pin=prompt('Defina o PIN de seis dígitos para registrar este número na Cloud API:');
+   if(!pin||!(/^[0-9]{6}$/.test(pin))){$('result').textContent='Informe um PIN de 6 dígitos para concluir.';resetMeta();return;}
+   params.pin=pin;
+  }
+  $('result').textContent='Verificando conta e número na Meta...';
+  try{const response=await api('/stores/'+id+'/meta/complete','POST',params);$('result').textContent='WhatsApp conectado: '+response.phoneNumber;resetMeta();await loadStores();}
+  catch(e){$('result').textContent='Falha na conexão: '+e.message;resetMeta();}
+ }
+ $('connectMeta').onclick=async()=>{
+  if(!selected){$('result').textContent='Salve a loja antes de conectar o WhatsApp.';return;}
+  resetMeta();
+  try{
+   const id=selected,setup=await api('/stores/'+id+'/meta/start','POST');
+   metaState=setup.state;await loadMetaSDK(setup.appId,setup.graphVersion);
+   $('result').textContent='Conclua o cadastro na janela da Meta.';
+   window.FB.login(response=>{
+    if(!response?.authResponse?.code){$('result').textContent='Autorização não concluída.';return;}
+    if(selected!==id){$('result').textContent='Loja alterada durante a conexão.';resetMeta();return;}
+    metaCode=response.authResponse.code;void finishMeta();
+   },{config_id:setup.configId,response_type:'code',override_default_response_type:true,extras:{version:'v4',setup:{}}});
+  }catch(e){$('result').textContent=e.message;resetMeta();}
+ };
+ $('disconnectMeta').onclick=async()=>{
+  if(!selected)return;
+  if(!confirm('Desativar atendimento automático neste número?'))return;
+  try{await api('/stores/'+selected+'/meta/disconnect','POST');$('result').textContent='Atendimento automático desativado.';await loadStores();}
+  catch(e){$('result').textContent=e.message;}
+ };
+
  loadStores().then(loadConversations).catch(e=>$('stores').textContent=e.message);
  </script></body></html>`;
 }
