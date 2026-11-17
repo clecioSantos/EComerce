@@ -47,9 +47,23 @@ const defaults: AgentSettingsInput = {
   tone: "descontraído e consultivo", instructions: "", emojis: true, upsell: true,
 };
 
-function remoteConfig(): { origin: string; authorization: string } | null {
-  const raw = process.env.AGENT_SERVICE_URL;
+function remoteConfig(): { origin: string; apiPrefix: string; requestOrigin: string; authorization: string } | null {
   const password = process.env.AGENT_ADMIN_PASSWORD;
+  if (process.env.AGENT_EMBEDDED === "true") {
+    if (!password) return null;
+    // Loopback requests reach the same Node server without consuming a second app slot.
+    // The internal admin route rejects all external TCP clients.
+    const port = Number(process.env.PORT ?? process.env.AGENT_EMBEDDED_PORT ?? 3000);
+    if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error("Porta interna inválida.");
+    const siteUrl = publicCommerceUrl();
+    return {
+      origin: "http://127.0.0.1:" + port,
+      apiPrefix: "/__internal/agent/admin/api",
+      requestOrigin: siteUrl,
+      authorization: "Basic " + Buffer.from("admin:" + password).toString("base64"),
+    };
+  }
+  const raw = process.env.AGENT_SERVICE_URL;
   if (!raw || !password) return null;
   const url = new URL(raw);
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
@@ -60,7 +74,12 @@ function remoteConfig(): { origin: string; authorization: string } | null {
         (url.hostname === "localhost" || url.hostname === "127.0.0.1"))) {
     throw new Error("O endereço do serviço de agentes precisa usar HTTPS.");
   }
-  return { origin: url.origin, authorization: "Basic " + Buffer.from("admin:" + password).toString("base64") };
+  return {
+    origin: url.origin,
+    apiPrefix: "/admin/api",
+    requestOrigin: url.origin,
+    authorization: "Basic " + Buffer.from("admin:" + password).toString("base64"),
+  };
 }
 
 function publicCommerceUrl(): string {
@@ -78,14 +97,14 @@ function publicCommerceUrl(): string {
 async function remote<T>(path: string, method = "GET", payload?: object): Promise<T> {
   const cfg = remoteConfig();
   if (!cfg) throw new Error("Serviço de agentes ainda não configurado no servidor.");
-  const response = await fetch(cfg.origin + "/admin/api" + path, {
+  const response = await fetch(cfg.origin + cfg.apiPrefix + path, {
     method,
     redirect: "error",
     cache: "no-store",
     signal: AbortSignal.timeout(12000),
     headers: {
       Authorization: cfg.authorization,
-      ...(payload ? { "Content-Type": "application/json", Origin: cfg.origin } : {}),
+      ...(payload ? { "Content-Type": "application/json", Origin: cfg.requestOrigin } : {}),
     },
     body: payload ? JSON.stringify(payload) : undefined,
   });
@@ -136,7 +155,7 @@ export async function getAgentState(): Promise<AgentState> {
     const configured = remoteConfig() !== null;
     if (!configured) return {
       ...fallback, configured: false, serviceAvailable: false,
-      reason: "Configure AGENT_SERVICE_URL e AGENT_ADMIN_PASSWORD na Hostinger e implante o serviço independente.",
+      reason: "Configure AGENT_EMBEDDED=true e as credenciais do agente na Hostinger, depois reinicie a aplicação.",
     };
     // Also check the remote before displaying an enabled setup button.
     const available = await remote<{ stores: RemoteStore[] }>("/stores");
@@ -153,7 +172,7 @@ export async function getAgentState(): Promise<AgentState> {
   } catch {
     return {
       ...fallback, configured: true, serviceAvailable: false,
-      reason: "Não foi possível acessar o serviço do agente. Verifique a URL, senha e estado do processo.",
+      reason: "Não foi possível acessar o serviço do agente. Verifique as variáveis do agente, a migração do banco e os logs de inicialização.",
     };
   }
 }
