@@ -48,9 +48,9 @@ export async function finishMetaSignupAction(input: unknown) {
   const schema = z.object({
     state: z.string().regex(/^[a-f0-9]{64}$/),
     code: z.string().min(4).max(2048),
-    wabaId: z.string().regex(/^\\d{6,25}$/),
-    phoneId: z.string().regex(/^\\d{6,25}$/),
-    pin: z.string().regex(/^\\d{6}$/).optional(),
+    wabaId: z.string().regex(/^\d{6,25}$/),
+    phoneId: z.string().regex(/^\d{6,25}$/),
+    pin: z.string().regex(/^\d{6}$/).optional(),
     coexistence: z.boolean(),
   });
   const parsed = schema.safeParse(input);
