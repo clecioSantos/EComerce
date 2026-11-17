@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { pool, query, type Store, type Conversation } from "./db.js";
@@ -192,8 +192,12 @@ async function work(){
   }
  }catch(e){console.error("worker",e instanceof Error?e.message:"unknown");}finally{running=false;}
 }
-const server=createServer(async(req,res)=>{
+export async function handleAgentRequest(req: IncomingMessage, res: ServerResponse) {
  const url=new URL(req.url||"/",config.PUBLIC_BASE_URL);
+ return handleAgentRoute(req,res,url);
+}
+
+async function handleAgentRoute(req:IncomingMessage,res:ServerResponse,url:URL){
  try{
   if(url.pathname==="/health"&&req.method==="GET")return respondJson(res,200,{ok:true});
   if(url.pathname==="/webhook/whatsapp")return await webhook(req,res,url);
@@ -209,7 +213,17 @@ const server=createServer(async(req,res)=>{
   responseError(res,/JSON inválido|inválid|obrigatóri|URL HTTPS|extensas|incorreto/.test(msg)?400:500,
     /duplicate key value/.test(msg)?"Identificador do WhatsApp já cadastrado.":msg.startsWith("Corpo excedeu")?msg:"Não foi possível processar a solicitação.");
  }
-});
-server.listen(config.PORT,()=>console.log("Sales agent listening on :"+config.PORT));
-setInterval(()=>{void work();},2000).unref();
-process.on("SIGTERM",()=>{server.close();void pool.end();});
+}
+
+let workerTimer: ReturnType<typeof setInterval> | undefined;
+/** Starts the inbox worker once, within the same Node.js process as the storefront. */
+export function startAgentWorker() {
+ if(workerTimer) return;
+ workerTimer=setInterval(()=>{void work();},2000);
+ workerTimer.unref();
+}
+export async function stopAgentWorker() {
+ if(workerTimer) {clearInterval(workerTimer);workerTimer=undefined;}
+ await pool.end();
+}
+
