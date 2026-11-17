@@ -31,14 +31,16 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  addresses    Address[]
-  orders       Order[]
-  reviews      Review[]
-  carts        Cart[]
-  couponUsages CouponUsage[]
-  accounts     Account[]
-  sessions     Session[]
-  savedCards   SavedCard[]
+  addresses                  Address[]
+  orders                     Order[]
+  reviews                    Review[]
+  carts                      Cart[]
+  couponUsages               CouponUsage[]
+  accounts                   Account[]
+  sessions                   Session[]
+  savedCards                 SavedCard[]
+  conditionalCustomer        ConditionalCustomer?
+  conditionalTermAcceptances ConditionalTermAcceptance[]
 
   @@map("users")
 }
@@ -155,8 +157,8 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  parent     Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children   Category[] @relation("CategoryTree")
+  parent     Category?   @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Category[]  @relation("CategoryTree")
   products   Product[]
   promotions Promotion[]
 
@@ -181,26 +183,26 @@ model ProductType {
 }
 
 model ProductAttribute {
-  id               String        @id @default(cuid())
-  productTypeId    String
-  name             String
-  slug             String
-  type             AttributeType @default(TEXT)
-  description      String?
-  unit             String?
-  isRequired       Boolean       @default(false)
-  allowMultiple    Boolean       @default(false)
-  isFilterable     Boolean       @default(false)
-  isVariantDefining Boolean      @default(false)
-  position         Int           @default(0)
-  metadata         Json?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                String        @id @default(cuid())
+  productTypeId     String
+  name              String
+  slug              String
+  type              AttributeType @default(TEXT)
+  description       String?
+  unit              String?
+  isRequired        Boolean       @default(false)
+  allowMultiple     Boolean       @default(false)
+  isFilterable      Boolean       @default(false)
+  isVariantDefining Boolean       @default(false)
+  position          Int           @default(0)
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  productType        ProductType               @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
-  values             ProductAttributeValue[]
-  assignments        ProductAttributeAssignment[]
-  variantAttributes  ProductVariantAttribute[]
+  productType       ProductType                  @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
+  values            ProductAttributeValue[]
+  assignments       ProductAttributeAssignment[]
+  variantAttributes ProductVariantAttribute[]
 
   @@unique([productTypeId, slug])
   @@index([productTypeId])
@@ -216,8 +218,8 @@ model ProductAttributeValue {
   metadata    Json?
   createdAt   DateTime @default(now())
 
-  attribute        ProductAttribute          @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-  assignments      ProductAttributeAssignment[]
+  attribute         ProductAttribute             @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  assignments       ProductAttributeAssignment[]
   variantAttributes ProductVariantAttribute[]
 
   @@unique([attributeId, slug])
@@ -263,15 +265,15 @@ model Product {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  productType  ProductType            @relation(fields: [productTypeId], references: [id])
-  category     Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  brand        Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  images       ProductImage[]
-  variants     ProductVariant[]
-  assignments  ProductAttributeAssignment[]
-  reviews      Review[]
-  cartItems    CartItem[]
-  orderItems   OrderItem[]
+  productType ProductType                  @relation(fields: [productTypeId], references: [id])
+  category    Category?                    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand       Brand?                       @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  images      ProductImage[]
+  variants    ProductVariant[]
+  assignments ProductAttributeAssignment[]
+  reviews     Review[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
 
   @@index([productTypeId])
   @@index([categoryId])
@@ -322,13 +324,14 @@ model ProductVariant {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  product    Product                   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  attributes ProductVariantAttribute[]
-  images     ProductImage[]
-  inventory  Inventory?
-  cartItems  CartItem[]
-  orderItems OrderItem[]
-  stockReservations StockReservation[]
+  product               Product                   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributes            ProductVariantAttribute[]
+  images                ProductImage[]
+  inventory             Inventory?
+  cartItems             CartItem[]
+  orderItems            OrderItem[]
+  stockReservations     StockReservation[]
+  conditionalStockHolds ConditionalStockHold[]
 
   @@unique([productId, signature])
   @@index([productId])
@@ -375,7 +378,7 @@ model Inventory {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  variant   ProductVariant       @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  variant   ProductVariant      @relation(fields: [variantId], references: [id], onDelete: Restrict)
   movements InventoryMovement[]
 
   @@map("inventory")
@@ -408,13 +411,13 @@ enum StockReservationStatus {
 }
 
 model StockReservation {
-  id        String                 @id @default(cuid())
-  orderId   String
-  variantId String
-  quantity  Int
-  status    StockReservationStatus @default(ACTIVE)
-  expiresAt DateTime
-  createdAt DateTime               @default(now())
+  id         String                 @id @default(cuid())
+  orderId    String
+  variantId  String
+  quantity   Int
+  status     StockReservationStatus @default(ACTIVE)
+  expiresAt  DateTime
+  createdAt  DateTime               @default(now())
   releasedAt DateTime?
 
   order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -505,52 +508,62 @@ enum PaymentMethod {
   OTHER
 }
 
+// Tipo do pedido. Compra Condicional reutiliza o Order (com snapshot próprio
+// em ConditionalPurchase).
+enum OrderType {
+  NORMAL
+  CONDITIONAL
+}
+
 model Order {
-  id                String        @id @default(cuid())
-  number            String        @unique
-  userId            String?
-  status            OrderStatus   @default(PENDING)
-  paymentStatus     PaymentStatus @default(PENDING)
-  customerName      String
-  customerEmail     String
-  customerPhone     String?
-  subtotal          Decimal       @db.Decimal(12, 2)
-  discountTotal     Decimal       @default(0) @db.Decimal(12, 2)
-  shippingTotal     Decimal       @default(0) @db.Decimal(12, 2)
-  taxTotal          Decimal       @default(0) @db.Decimal(12, 2)
-  grandTotal        Decimal       @db.Decimal(12, 2)
-  currency          String        @default("BRL")
-  couponId          String?
-  couponCode        String?
-  idempotencyKey    String?       @unique
-  requestHash       String?
+  id                       String        @id @default(cuid())
+  number                   String        @unique
+  userId                   String?
+  type                     OrderType     @default(NORMAL)
+  status                   OrderStatus   @default(PENDING)
+  paymentStatus            PaymentStatus @default(PENDING)
+  customerName             String
+  customerEmail            String
+  customerPhone            String?
+  subtotal                 Decimal       @db.Decimal(12, 2)
+  discountTotal            Decimal       @default(0) @db.Decimal(12, 2)
+  shippingTotal            Decimal       @default(0) @db.Decimal(12, 2)
+  taxTotal                 Decimal       @default(0) @db.Decimal(12, 2)
+  grandTotal               Decimal       @db.Decimal(12, 2)
+  currency                 String        @default("BRL")
+  couponId                 String?
+  couponCode               String?
+  idempotencyKey           String?       @unique
+  requestHash              String?
   // Carrinho de origem: só é esvaziado quando o pagamento é confirmado (PAID).
-  cartId            String?
-  shippingAddress   Json
-  billingAddress    Json?
-  shippingProvider  String?
-  shippingMethod    String?
-  shippingServiceId String?
-  shippingCompany   String?
+  cartId                   String?
+  shippingAddress          Json
+  billingAddress           Json?
+  shippingProvider         String?
+  shippingMethod           String?
+  shippingServiceId        String?
+  shippingCompany          String?
   shippingEstimatedDaysMin Int?
   shippingEstimatedDaysMax Int?
-  shippingSnapshot  Json?
-  trackingCode      String?
-  notes             String?
-  metadata          Json?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  shippingSnapshot         Json?
+  trackingCode             String?
+  notes                    String?
+  metadata                 Json?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
 
-  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  coupon       Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  items        OrderItem[]
-  payments     Payment[]
-  couponUsage  CouponUsage?
-  stockReservations StockReservation[]
+  user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  coupon              Coupon?              @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items               OrderItem[]
+  payments            Payment[]
+  couponUsage         CouponUsage?
+  stockReservations   StockReservation[]
+  conditionalPurchase ConditionalPurchase?
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([type])
   @@index([cartId])
   @@map("orders")
 }
@@ -572,9 +585,10 @@ model OrderItem {
   metadata           Json?
   createdAt          DateTime @default(now())
 
-  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  order           Order                    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product?                 @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant         ProductVariant?          @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  conditionalItem ConditionalPurchaseItem?
 
   @@index([orderId])
   @@map("order_items")
@@ -853,4 +867,279 @@ model StoreSettings {
   updatedAt          DateTime @updatedAt
 
   @@map("store_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Compra Condicional
+// ---------------------------------------------------------------------------
+// Loja única: a política é um singleton (id="default"), como StoreSettings.
+// O `Order` é reutilizado com `type = CONDITIONAL` + `ConditionalPurchase`.
+
+enum ReturnShippingPolicy {
+  FREE
+  MIN_PURCHASE
+  PAID
+}
+
+model ConditionalPurchasePolicy {
+  id                        String               @id @default("default")
+  enabled                   Boolean              @default(false)
+  maxItemsPerOrder          Int                  @default(5)
+  maxOrderAmount            Decimal              @default(1500) @db.Decimal(12, 2)
+  maxOpenConditionalOrders  Int                  @default(1)
+  maxCustomerExposure       Decimal              @default(1500) @db.Decimal(12, 2)
+  decisionDeadlineDays      Int                  @default(7)
+  // Frete de devolução: grátis, grátis acima de X, ou sempre cobrado.
+  returnShippingPolicy      ReturnShippingPolicy @default(FREE)
+  returnShippingMinPurchase Decimal?             @db.Decimal(12, 2)
+  returnShippingAmount      Decimal?             @db.Decimal(12, 2)
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+
+  @@map("conditional_purchase_policies")
+}
+
+enum ConditionalCustomerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+// Status/aprovação do cliente + override de política (nulos = herda da loja).
+model ConditionalCustomer {
+  id          String                    @id @default(cuid())
+  userId      String                    @unique
+  status      ConditionalCustomerStatus @default(PENDING)
+  approvedAt  DateTime?
+  approvedBy  String?
+  rejectedAt  DateTime?
+  rejectedBy  String?
+  suspendedAt DateTime?
+  suspendedBy String?
+  reason      String?
+
+  overrideEnabled        Boolean?
+  overrideMaxItems       Int?
+  overrideMaxOrderAmount Decimal? @db.Decimal(12, 2)
+  overrideMaxOpenOrders  Int?
+  overrideMaxExposure    Decimal? @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("conditional_customers")
+}
+
+model ConditionalTerm {
+  id        String   @id @default(cuid())
+  version   Int      @unique
+  title     String
+  content   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  acceptances ConditionalTermAcceptance[]
+  purchases   ConditionalPurchase[]
+
+  @@map("conditional_terms")
+}
+
+model ConditionalTermAcceptance {
+  id         String   @id @default(cuid())
+  termId     String
+  userId     String
+  acceptedAt DateTime @default(now())
+
+  term ConditionalTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([termId, userId])
+  @@index([userId])
+  @@map("conditional_term_acceptances")
+}
+
+enum ConditionalPurchaseStatus {
+  PENDING_APPROVAL
+  APPROVED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  DECISION_PENDING
+  PROCESSING_DECISION
+  COMPLETED
+  RETURNING
+  INSPECTING
+  ISSUE_FOUND
+  CANCELLED
+  EXPIRED
+}
+
+model ConditionalPurchase {
+  id                  String                    @id @default(cuid())
+  orderId             String                    @unique
+  status              ConditionalPurchaseStatus @default(PENDING_APPROVAL)
+  termId              String?
+  termVersion         Int?
+  termAcceptedAt      DateTime?
+  // Snapshot da política efetiva aplicada na criação do pedido.
+  policySnapshot      Json?
+  // Valor das mercadorias sob responsabilidade do cliente (entra na exposição).
+  exposureAmount      Decimal                   @db.Decimal(12, 2)
+  deliveredAt         DateTime?
+  decisionDeadline    DateTime?
+  decisionFinalizedAt DateTime?
+  approvedAt          DateTime?
+  approvedBy          String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  order      Order                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  term       ConditionalTerm?          @relation(fields: [termId], references: [id], onDelete: SetNull)
+  items      ConditionalPurchaseItem[]
+  stockHolds ConditionalStockHold[]
+  returns    Return[]
+
+  @@index([status])
+  @@index([decisionDeadline])
+  @@map("conditional_purchases")
+}
+
+enum ConditionalItemDecision {
+  KEEP
+  RETURN
+}
+
+enum ConditionalItemStatus {
+  PENDING_DECISION
+  KEEP
+  RETURN
+  RETURNING
+  RETURNED
+  INSPECTED
+}
+
+enum ConditionalInspectionStatus {
+  PENDING
+  ACCEPTED
+  DAMAGED
+  MISSING
+  INCOMPLETE
+}
+
+model ConditionalPurchaseItem {
+  id                    String                       @id @default(cuid())
+  conditionalPurchaseId String
+  orderItemId           String                       @unique
+  status                ConditionalItemStatus        @default(PENDING_DECISION)
+  customerDecision      ConditionalItemDecision?
+  decidedAt             DateTime?
+  returnedAt            DateTime?
+  receivedAt            DateTime?
+  inspectionStatus      ConditionalInspectionStatus? @default(PENDING)
+  inspectedAt           DateTime?
+  inspectedBy           String?
+  inspectionNote        String?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  conditionalPurchase ConditionalPurchase   @relation(fields: [conditionalPurchaseId], references: [id], onDelete: Cascade)
+  orderItem           OrderItem             @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  stockHold           ConditionalStockHold?
+  returnItems         ReturnItem[]
+
+  @@index([conditionalPurchaseId])
+  @@index([status])
+  @@map("conditional_purchase_items")
+}
+
+enum ConditionalStockHoldStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
+}
+
+// Reserva de longo prazo da mercadoria "em posse do cliente" (dias), diferente
+// da StockReservation (TTL curto, vinculada ao pagamento normal).
+model ConditionalStockHold {
+  id                    String                     @id @default(cuid())
+  conditionalPurchaseId String
+  conditionalItemId     String?                    @unique
+  variantId             String
+  quantity              Int
+  status                ConditionalStockHoldStatus @default(ACTIVE)
+  createdAt             DateTime                   @default(now())
+  releasedAt            DateTime?
+
+  conditionalPurchase ConditionalPurchase      @relation(fields: [conditionalPurchaseId], references: [id], onDelete: Cascade)
+  item                ConditionalPurchaseItem? @relation(fields: [conditionalItemId], references: [id], onDelete: Cascade)
+  variant             ProductVariant           @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([conditionalPurchaseId])
+  @@index([variantId])
+  @@index([status])
+  @@map("conditional_stock_holds")
+}
+
+enum ReturnStatus {
+  REQUESTED
+  IN_TRANSIT
+  RECEIVED
+  INSPECTING
+  COMPLETED
+  ISSUE
+}
+
+model Return {
+  id                    String       @id @default(cuid())
+  conditionalPurchaseId String
+  status                ReturnStatus @default(REQUESTED)
+  receivedAt            DateTime?
+  inspectedAt           DateTime?
+  inspectedBy           String?
+  note                  String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  conditionalPurchase ConditionalPurchase @relation(fields: [conditionalPurchaseId], references: [id], onDelete: Cascade)
+  items               ReturnItem[]
+
+  @@index([conditionalPurchaseId])
+  @@index([status])
+  @@map("returns")
+}
+
+model ReturnItem {
+  id                String                      @id @default(cuid())
+  returnId          String
+  conditionalItemId String
+  inspectionStatus  ConditionalInspectionStatus @default(PENDING)
+  note              String?
+  createdAt         DateTime                    @default(now())
+
+  return          Return                  @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  conditionalItem ConditionalPurchaseItem @relation(fields: [conditionalItemId], references: [id], onDelete: Cascade)
+
+  @@unique([returnId, conditionalItemId])
+  @@map("return_items")
+}
+
+// Auditoria genérica de eventos críticos (actor/timestamp/entidade/metadata).
+model AuditEvent {
+  id          String   @id @default(cuid())
+  event       String
+  entity      String
+  entityId    String?
+  actorUserId String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("audit_events")
 }
