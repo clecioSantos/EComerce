@@ -1,0 +1,294 @@
+{
+  "collection": "premium-fashion-v1",
+  "disclaimer": "Produtos, valores, composição, estoque e fotografias são demonstrativos. Fotos editoriais ilustrativas, não correspondem necessariamente ao item descrito. Não usar comercialmente sem revisão.",
+  "categories": [
+    {
+      "slug": "alfaiataria-feminina",
+      "name": "Alfaiataria",
+      "parent": "feminino",
+      "position": 2
+    },
+    {
+      "slug": "saias-femininas",
+      "name": "Saias",
+      "parent": "feminino",
+      "position": 3
+    },
+    {
+      "slug": "tricos-femininos",
+      "name": "Tricôs",
+      "parent": "feminino",
+      "position": 4
+    },
+    {
+      "slug": "calcas-femininas",
+      "name": "Calças Femininas",
+      "parent": "feminino",
+      "position": 5
+    },
+    {
+      "slug": "camisas-masculinas",
+      "name": "Camisas",
+      "parent": "masculino",
+      "position": 2
+    },
+    {
+      "slug": "alfaiataria-masculina",
+      "name": "Alfaiataria Masculina",
+      "parent": "masculino",
+      "position": 3
+    },
+    {
+      "slug": "casacos-masculinos",
+      "name": "Casacos Masculinos",
+      "parent": "masculino",
+      "position": 4
+    }
+  ],
+  "colors": [
+    [
+      "bege",
+      "Bege"
+    ],
+    [
+      "terracota",
+      "Terracota"
+    ],
+    [
+      "rosa",
+      "Rosé"
+    ]
+  ],
+  "materials": [
+    [
+      "linho",
+      "Linho"
+    ],
+    [
+      "viscose",
+      "Viscose"
+    ],
+    [
+      "crepe",
+      "Crepe"
+    ],
+    [
+      "alfaiataria",
+      "Tecido de alfaiataria"
+    ],
+    [
+      "tricot",
+      "Tricô"
+    ]
+  ],
+  "products": [
+    {
+      "slug": "demo-vestido-midi-aurora",
+      "name": "Vestido Midi Aurora",
+      "category": "vestidos",
+      "price": 649.9,
+      "color": "terracota",
+      "material": "crepe",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1746025241095-b2e6dc32ca4f",
+      "source": "fRYtqxRTols",
+      "description": "Vestido midi de proposta fluida, pensado para ocasiões especiais e produções elegantes."
+    },
+    {
+      "slug": "demo-vestido-preto-essencial",
+      "name": "Vestido Preto Essencial",
+      "category": "vestidos",
+      "price": 759.9,
+      "color": "preto",
+      "material": "crepe",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1701532969559-3a462ff02484",
+      "source": "MwWnKQUC8xc",
+      "description": "Vestido preto com presença sofisticada e proposta atemporal para eventos e encontros."
+    },
+    {
+      "slug": "demo-vestido-longo-riviera",
+      "name": "Vestido Longo Riviera",
+      "category": "vestidos",
+      "price": 829.9,
+      "color": "azul",
+      "material": "viscose",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1678534957126-af6aaaae28cb",
+      "source": "GpuvgzaF7Dg",
+      "description": "Vestido longo de inspiração contemporânea, com visual leve e elegante."
+    },
+    {
+      "slug": "demo-blazer-alfaiataria-areia",
+      "name": "Blazer de Alfaiataria Areia",
+      "category": "alfaiataria-feminina",
+      "price": 949.9,
+      "color": "bege",
+      "material": "alfaiataria",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1747814965209-2301e535f209",
+      "source": "hnAWDdHSgSI",
+      "description": "Blazer feminino de linhas estruturadas, para composições de alfaiataria modernas."
+    },
+    {
+      "slug": "demo-blazer-urbano-feminino",
+      "name": "Blazer Urbano Feminino",
+      "category": "alfaiataria-feminina",
+      "price": 899.9,
+      "color": "bege",
+      "material": "alfaiataria",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1625519205691-1b6b7b24622e",
+      "source": "NVV_0qVJ5lw",
+      "description": "Peça de sobreposição com estética minimalista, ideal para visuais bem cuidados."
+    },
+    {
+      "slug": "demo-camisa-feminina-off-white",
+      "name": "Camisa Feminina Off-White",
+      "category": "blusas",
+      "price": 379.9,
+      "color": "branco",
+      "material": "algodao",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1572391016415-a015dd34a2b3",
+      "source": "atuK1TfABg8",
+      "description": "Camisa clássica de inspiração refinada, versátil em combinações casuais e sociais."
+    },
+    {
+      "slug": "demo-blusa-fluida-classica",
+      "name": "Blusa Fluida Clássica",
+      "category": "blusas",
+      "price": 329.9,
+      "color": "branco",
+      "material": "viscose",
+      "gender": "feminino",
+      "featured": false,
+      "photo": "1572391016415-a015dd34a2b3",
+      "source": "atuK1TfABg8",
+      "description": "Blusa de visual delicado e caimento leve, para um guarda-roupa versátil."
+    },
+    {
+      "slug": "demo-saia-midi-signature",
+      "name": "Saia Midi Signature",
+      "category": "saias-femininas",
+      "price": 489.9,
+      "color": "preto",
+      "material": "crepe",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1682397125309-56077754235d",
+      "source": "dCEm2MVcTmc",
+      "description": "Saia midi de proposta editorial, criada para looks marcantes e elegantes."
+    },
+    {
+      "slug": "demo-cardiga-rose",
+      "name": "Cardigã Rosé",
+      "category": "tricos-femininos",
+      "price": 469.9,
+      "color": "rosa",
+      "material": "tricot",
+      "gender": "feminino",
+      "featured": false,
+      "photo": "1676149038590-2f700d9598aa",
+      "source": "5Uw4P1XHgeo",
+      "description": "Cardigã com estilo contemporâneo e toque delicado para sobreposições."
+    },
+    {
+      "slug": "demo-saia-elegance",
+      "name": "Saia Elegance",
+      "category": "saias-femininas",
+      "price": 529.9,
+      "color": "bege",
+      "material": "alfaiataria",
+      "gender": "feminino",
+      "featured": false,
+      "photo": "1776320146488-988db83cb773",
+      "source": "ldVcgfhGuGw",
+      "description": "Saia feminina de inspiração elegante e acabamento visual discreto."
+    },
+    {
+      "slug": "demo-jeans-feminino-premium",
+      "name": "Jeans Feminino Premium",
+      "category": "calcas-femininas",
+      "price": 499.9,
+      "color": "azul",
+      "material": "jeans",
+      "gender": "feminino",
+      "featured": false,
+      "photo": "1572391016415-a015dd34a2b3",
+      "source": "atuK1TfABg8",
+      "description": "Jeans feminino com proposta de modelagem atual e visual versátil."
+    },
+    {
+      "slug": "demo-conjunto-alfaiataria",
+      "name": "Conjunto de Alfaiataria Contemporâneo",
+      "category": "alfaiataria-feminina",
+      "price": 1199.9,
+      "color": "bege",
+      "material": "alfaiataria",
+      "gender": "feminino",
+      "featured": true,
+      "photo": "1747814965209-2301e535f209",
+      "source": "hnAWDdHSgSI",
+      "description": "Composição feminina de alfaiataria em proposta premium, elegante e atemporal."
+    },
+    {
+      "slug": "demo-camisa-linho-masculina",
+      "name": "Camisa Masculina de Linho",
+      "category": "camisas-masculinas",
+      "price": 469.9,
+      "color": "branco",
+      "material": "linho",
+      "gender": "masculino",
+      "featured": false,
+      "photo": "1792433413663-31eb3dccf89f",
+      "source": "xIp4ZjM-Koo",
+      "description": "Camisa masculina de inspiração natural, versátil para ocasiões descontraídas com sofisticação."
+    },
+    {
+      "slug": "demo-camisa-social-signature",
+      "name": "Camisa Social Signature",
+      "category": "camisas-masculinas",
+      "price": 429.9,
+      "color": "branco",
+      "material": "algodao",
+      "gender": "masculino",
+      "featured": false,
+      "photo": "1675194141373-0496526eb916",
+      "source": "TGbyYVI1CXU",
+      "description": "Camisa social masculina de estética clássica para composições formais."
+    },
+    {
+      "slug": "demo-conjunto-masculino-classico",
+      "name": "Conjunto Masculino Clássico",
+      "category": "alfaiataria-masculina",
+      "price": 1299.9,
+      "color": "branco",
+      "material": "alfaiataria",
+      "gender": "masculino",
+      "featured": false,
+      "photo": "1734418046223-567d550f457d",
+      "source": "tITRC1rBE54",
+      "description": "Conjunto masculino de proposta formal e imagem contemporânea."
+    },
+    {
+      "slug": "demo-jaqueta-urbana-masculina",
+      "name": "Jaqueta Urbana Masculina",
+      "category": "casacos-masculinos",
+      "price": 789.9,
+      "color": "preto",
+      "material": "algodao",
+      "gender": "masculino",
+      "featured": false,
+      "photo": "1553629853-e0e253b24509",
+      "source": "0HmH83a6I6w",
+      "description": "Jaqueta masculina de visual urbano, com proposta premium para o dia a dia."
+    }
+  ]
+}
