@@ -99,7 +99,25 @@ export async function readCartToken(): Promise<string | undefined> {
   return (await cookies()).get(CART_COOKIE)?.value;
 }
 
+/** A transfer from the sales agent has its own short-lived, cookie-bound cart.
+ * Prefer it during checkout even if the shopper is signed in.
+ */
+async function getAgentHandoffCart() {
+  const token = await readCartToken();
+  if (!token) return null;
+  return prisma.cart.findFirst({
+    where: {
+      sessionToken: token,
+      status: "ACTIVE",
+      checkoutLinks: { some: { usedAt: { not: null } } },
+    },
+    include: cartInclude,
+  });
+}
+
 export async function getActiveCart(userId?: string | null) {
+  const agentCart = await getAgentHandoffCart();
+  if (agentCart) return agentCart;
   if (userId) {
     return prisma.cart.findFirst({
       where: { userId, status: "ACTIVE" },
@@ -148,6 +166,8 @@ export async function getOrCreateUserCart(userId: string) {
  * do convidado — só pode ser chamado em Server Action ou Route Handler.
  */
 export async function getOrCreateCart(userId?: string | null) {
+  const agentCart = await getAgentHandoffCart();
+  if (agentCart) return agentCart;
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
