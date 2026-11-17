@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, ShoppingBag, Sparkles, Truck } from "lucide-react";
+import { ArrowRight, ShieldCheck, Sparkles, Truck } from "lucide-react";
 
 import { ProductGrid } from "@/components/product/product-grid";
 import { Button } from "@/components/ui/button";
