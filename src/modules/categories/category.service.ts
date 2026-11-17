@@ -29,6 +29,7 @@ export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 // header chamam `getCategoryTree` na mesma renderização.
 export const listCategories = cache(async (): Promise<CategoryLike[]> => {
   const categories = await prisma.category.findMany({
+    where: { isActive: true },
     orderBy: [{ position: "asc" }, { name: "asc" }],
     select: {
       id: true,
