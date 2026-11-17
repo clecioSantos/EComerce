@@ -1,8 +1,9 @@
 import { decrypt } from "./security.js";
 import type { Store } from "./db.js";
+import { validateCommerceUrl } from "./commerce-security.js";
 
 async function commerce(store: Store, method: "GET"|"POST", path: string, data?: unknown) {
- const base = new URL(store.store_url);
+ const base = validateCommerceUrl(store.store_url);
  if (base.protocol !== "https:" && !(base.hostname === "localhost" && base.protocol === "http:"))
    throw new Error("Loja deve usar HTTPS");
  const endpoint = new URL(path, base);
@@ -14,7 +15,7 @@ async function commerce(store: Store, method: "GET"|"POST", path: string, data?:
   const response = await fetch(endpoint, {
     method, headers: { Authorization: "Bearer " + decrypt(store.commerce_api_key_enc),
       ...(data ? { "Content-Type": "application/json" } : {}) },
-    body: data ? JSON.stringify(data) : undefined, signal: controller.signal,
+    body: data ? JSON.stringify(data) : undefined, redirect: "error", signal: controller.signal,
   });
   const payload = await response.json();
   if (!response.ok) throw new Error("API da loja indisponível ou recusou a solicitação (" + response.status + ")");
