@@ -35,7 +35,7 @@ export async function completeSignup(expectedStoreId:string,input:{state:string;
  } catch(err){await client.query("ROLLBACK").catch(()=>{});throw err;} finally{client.release();}
  // The authorization code is exchanged only server-side. Never trust WABA or phone IDs from the browser alone.
  const url=new URL(graph()+"/oauth/access_token");
- url.searchParams.set("client_id",config.META_APP_ID);
+ url.searchParams.set("client_id",config.META_APP_ID!);
  url.searchParams.set("client_secret",config.META_APP_SECRET);
  url.searchParams.set("code",input.code);
  const exchange=await graphJson(url.toString());
