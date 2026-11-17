@@ -1,7 +1,8 @@
 import Link from "next/link";
+import type { AppearanceInput } from "@/modules/settings/appearance";
 
-export function StoreFooter() {
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME ?? "E-commerce Core";
+export function StoreFooter({ appearance }: { appearance: AppearanceInput }) {
+  const siteName = appearance.name;
   const year = new Date().getFullYear();
 
   return (
@@ -10,11 +11,11 @@ export function StoreFooter() {
         <div>
           <p className="text-base font-semibold">{siteName}</p>
           <p className="text-muted-foreground mt-2 text-sm">
-            Plataforma modular de e-commerce. Esta loja é uma demonstração.
+            {appearance.tagline}
           </p>
         </div>
         <div className="text-sm">
-          <p className="mb-2 font-medium">Demonstração</p>
+          <p className="mb-2 font-medium">Atendimento</p>
           <ul className="text-muted-foreground space-y-1">
             <li>
               <Link href="/produtos" className="hover:text-foreground">
@@ -34,13 +35,8 @@ export function StoreFooter() {
           </ul>
         </div>
         <div className="text-sm">
-          <p className="mb-2 font-medium">Plataforma</p>
+          <p className="mb-2 font-medium">Sua conta</p>
           <ul className="text-muted-foreground space-y-1">
-            <li>
-              <Link href="/admin" className="hover:text-foreground">
-                Painel administrativo
-              </Link>
-            </li>
             <li>
               <Link href="/login" className="hover:text-foreground">
                 Entrar
@@ -55,7 +51,7 @@ export function StoreFooter() {
         </div>
       </div>
       <div className="text-muted-foreground border-t px-4 py-4 text-center text-xs">
-        © {year} {siteName}. Plataforma de demonstração.
+        © {year} {siteName}. Todos os direitos reservados.
       </div>
     </footer>
   );

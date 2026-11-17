@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { AppearanceInput } from "@/modules/settings/appearance";
 
 import { CartButton } from "@/components/layout/cart-button";
 import {
@@ -12,9 +13,11 @@ import { getCategoryTree } from "@/modules/categories/category.service";
 export async function StoreHeader({
   cartCount,
   user,
+  appearance,
 }: {
   cartCount: number;
   user: HeaderUser | null;
+  appearance: AppearanceInput;
 }) {
   const tree = await getCategoryTree();
   const categories: NavCategory[] = tree.map((node) => ({
@@ -25,14 +28,15 @@ export async function StoreHeader({
       slug: child.category.slug,
     })),
   }));
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME ?? "E-commerce Core";
+
 
   return (
-    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 w-full border-b backdrop-blur">
+    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 w-full border-b backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4">
         <MobileMenu categories={categories} />
-        <Link href="/" className="text-lg font-bold tracking-tight whitespace-nowrap">
-          {siteName}
+        <Link href="/" className="flex min-w-0 items-center gap-2.5 text-lg font-semibold tracking-tight" aria-label={appearance.name}>
+          {appearance.logoUrl ? <img src={appearance.logoUrl} alt="" className="h-9 w-auto max-w-32 object-contain" /> : <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-sm bg-primary text-sm font-bold text-primary-foreground">{appearance.name.slice(0, 1).toUpperCase()}</span>}
+          <span className="max-w-36 truncate sm:max-w-56">{appearance.name}</span>
         </Link>
         <SearchBar className="ml-2 hidden max-w-md flex-1 md:block" />
         <div className="ml-auto flex items-center gap-1">
