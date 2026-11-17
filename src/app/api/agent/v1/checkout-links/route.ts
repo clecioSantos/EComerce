@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       });
     });
 
-    const url = new URL("/agent-checkout/" + token, request.url);
+    const url = new URL("/agent-checkout/" + token, process.env.NEXT_PUBLIC_SITE_URL || request.url);
     return Response.json({ checkoutUrl: url.toString(), expiresAt: expiresAt.toISOString() }, { status: 201 });
   } catch (error) {
     if (error instanceof SyntaxError) {
