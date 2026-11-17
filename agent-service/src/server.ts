@@ -61,7 +61,7 @@ async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
   if(action==="start")return respondJson(res,200,await prepareSignup(storeId));
   if(action==="disconnect")return respondJson(res,200,await disconnectSignup(storeId));
   const body=await requestJson(req);
-  const result=await completeSignup({state:String(body.state||""),code:String(body.code||""),wabaId:String(body.wabaId||""),phoneId:String(body.phoneId||""),pin:typeof body.pin==="string"?body.pin:undefined,coexistence:body.coexistence===true});
+  const result=await completeSignup(storeId,{state:String(body.state||""),code:String(body.code||""),wabaId:String(body.wabaId||""),phoneId:String(body.phoneId||""),pin:typeof body.pin==="string"?body.pin:undefined,coexistence:body.coexistence===true});
   if(result.storeId!==storeId) return responseError(res,403,"Loja não autorizada");
   return respondJson(res,200,result);
  }
