@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
 import { getStoreAppearance } from "@/modules/settings/appearance";
 import { StoreFooter } from "@/components/layout/store-footer";
 import { StoreHeader } from "@/components/layout/store-header";
@@ -6,6 +7,16 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { getCartDTO } from "@/modules/cart/cart.service";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const appearance = await getStoreAppearance();
+  return {
+    title: { default: appearance.name, template: `%s | ${appearance.name}` },
+    applicationName: appearance.name,
+    description: appearance.tagline,
+    openGraph: { title: appearance.name, description: appearance.tagline, siteName: appearance.name },
+  };
+}
 
 export default async function StoreLayout({ children }: LayoutProps<"/">) {
   const [currentUser, appearance] = await Promise.all([getCurrentUser(), getStoreAppearance()]);
