@@ -13,6 +13,8 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   try {
     const { storeId } = await authenticateAgent(request);
+    // The browser checkout is still single-store. Fail closed until storefront tenant routing is complete.
+    if (storeId !== "legacy-store") return Response.json({ error: "Checkout multiloja ainda não habilitado com isolamento completo." }, { status: 409 });
     const parsed = requestSchema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "Itens inválidos." }, { status: 400 });
 
