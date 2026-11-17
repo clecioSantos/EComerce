@@ -25,7 +25,7 @@ export function MobileMenu({ categories }: { categories: NavCategory[] }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        render={<Button variant="ghost" size="icon" className="md:hidden" />}
+        render={<Button variant="ghost" size="icon" className="shrink-0 md:hidden" />}
       >
         <Menu className="size-5" />
         <span className="sr-only">Abrir menu</span>
