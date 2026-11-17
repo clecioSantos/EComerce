@@ -1,135 +1,81 @@
 import Link from "next/link";
+import { ArrowRight, ShieldCheck, ShoppingBag, Sparkles, Truck } from "lucide-react";
 
 import { ProductGrid } from "@/components/product/product-grid";
 import { Button } from "@/components/ui/button";
-import {
-  getFeaturedProducts,
-  searchProducts,
-} from "@/modules/catalog/catalog.service";
+import { getFeaturedProducts, searchProducts } from "@/modules/catalog/catalog.service";
 import { getCategoryTree } from "@/modules/categories/category.service";
+import { getStoreAppearance } from "@/modules/settings/appearance";
 
 export const dynamic = "force-dynamic";
 
-const FEATURES = [
-  { title: "Catálogo genérico", description: "Tipos de produto configuráveis." },
-  { title: "Variantes por atributos", description: "Cor/Tamanho, RAM/Storage." },
-  { title: "Estoque por variante", description: "Reservas e auditoria." },
-  { title: "Checkout idempotente", description: "Sem pedidos duplicados." },
-  { title: "Pagamentos plugáveis", description: "Troque o provedor." },
-  { title: "Admin completo", description: "Catálogo, pedidos e cupons." },
-];
-
 export default async function HomePage() {
-  const [featured, latest, categories] = await Promise.all([
+  const [featured, latest, categories, appearance] = await Promise.all([
     getFeaturedProducts(8),
     searchProducts({ sort: "newest", pageSize: 8 }),
     getCategoryTree(),
+    getStoreAppearance(),
   ]);
 
   return (
     <div className="flex flex-col">
-      <section className="bg-muted/40 border-b">
-        <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-16 md:grid-cols-2 md:items-center md:py-24">
-          <div className="space-y-5">
-            <p className="text-muted-foreground text-sm font-medium tracking-wide uppercase">
-              E-commerce Core
+      <section className="relative overflow-hidden border-b bg-[#f7f6f3] text-[#1d2933]">
+        <div className="pointer-events-none absolute -right-28 top-8 size-80 rounded-full bg-[var(--brand-accent)] opacity-10 blur-3xl md:size-[34rem]" />
+        <div className="relative mx-auto grid w-full max-w-7xl gap-12 px-5 py-16 md:grid-cols-[1.2fr_0.8fr] md:items-center md:px-8 md:py-24">
+          <div className="max-w-2xl space-y-6">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#57616a]">
+              <span className="h-px w-7 bg-[var(--brand-accent)]" /> Novidades e favoritos
             </p>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-              E-commerce modular para qualquer segmento
+            <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+              {appearance.tagline}
             </h1>
-            <p className="text-muted-foreground max-w-md text-base">
-              Catálogo, variantes, estoque e checkout desacoplados do tipo de
-              produto.
+            <p className="max-w-md text-base leading-relaxed text-[#626a71]">
+              Conheça nossa seleção de produtos e encontre o que você procura, com uma experiência de compra simples e segura.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Button size="lg" render={<Link href="/produtos" />}>
-                Ver a demonstração
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                render={<Link href="/categorias/eletronicos" />}
-              >
-                Ver eletrônicos
-              </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="lg" render={<Link href="/produtos" />}>Explorar produtos <ArrowRight className="size-4" /></Button>
+              {categories[0] ? <Button size="lg" variant="outline" render={<Link href={`/categorias/${categories[0].category.slug}`} />}>Ver categorias</Button> : null}
             </div>
           </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {categories.slice(0, 4).map((node) => (
-              <Link
-                key={node.category.slug}
-                href={`/categorias/${node.category.slug}`}
-                className="bg-background hover:border-foreground/30 rounded-lg border p-5 transition-colors"
-              >
-                <p className="font-semibold">{node.category.name}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto w-full max-w-7xl px-4 py-12">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((feature) => (
-            <div key={feature.title} className="bg-background rounded-lg border p-5">
-              <h3 className="font-medium">{feature.title}</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                {feature.description}
-              </p>
+          <div className="relative hidden min-h-64 items-center justify-center rounded-sm border border-[#e4e0d9] bg-white/65 p-8 md:flex">
+            <div className="absolute left-5 top-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7a817f]">Sua loja, seu estilo</div>
+            <div className="space-y-5 text-center">
+              <div className="mx-auto flex size-20 items-center justify-center rounded-sm bg-[var(--brand-accent)]/20"><ShoppingBag className="size-9 text-[#45515a]" strokeWidth={1.4} /></div>
+              <p className="text-xl font-semibold tracking-tight">{appearance.name}</p>
+              <p className="text-sm text-[#6c757c]">Uma experiência feita para você.</p>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="bg-muted/40 border-y">
-        <div className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-12 md:grid-cols-2">
-          <Link
-            href="/categorias/camisetas"
-            className="bg-background hover:border-foreground/30 rounded-lg border p-6 transition-colors"
-          >
-            <p className="text-muted-foreground text-xs uppercase">Vestuário</p>
-            <p className="mt-1 font-semibold">Camiseta — Cor × Tamanho</p>
-          </Link>
-          <Link
-            href="/produtos/notebook-pro-14"
-            className="bg-background hover:border-foreground/30 rounded-lg border p-6 transition-colors"
-          >
-            <p className="text-muted-foreground text-xs uppercase">Eletrônicos</p>
-            <p className="mt-1 font-semibold">Notebook — RAM × Armazenamento</p>
-          </Link>
-        </div>
-      </section>
-
-      {featured.length > 0 ? (
-        <section className="mx-auto w-full max-w-7xl px-4 py-12">
-          <div className="mb-6 flex items-end justify-between">
-            <h2 className="text-xl font-semibold tracking-tight">Destaques</h2>
-            <Button variant="link" render={<Link href="/produtos" />}>
-              Ver tudo
-            </Button>
+            <div className="absolute bottom-5 right-5 h-1 w-16 bg-[var(--brand-accent)]" />
           </div>
+        </div>
+      </section>
+
+      <div className="border-b">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-5 py-5 text-xs text-muted-foreground sm:grid-cols-3 md:px-8">
+          <p className="flex items-center gap-2"><ShieldCheck className="size-4 text-foreground" /> Compra com segurança</p>
+          <p className="flex items-center gap-2"><Truck className="size-4 text-foreground" /> Consulte opções de entrega</p>
+          <p className="flex items-center gap-2"><Sparkles className="size-4 text-foreground" /> Produtos selecionados</p>
+        </div>
+      </div>
+
+      {categories.length > 0 && <section className="mx-auto w-full max-w-7xl px-5 py-14 md:px-8">
+        <div className="mb-7 flex items-end justify-between gap-4">
+          <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Descubra</p><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Compre por categoria</h2></div>
+          <Link href="/produtos" className="text-sm font-medium hover:underline">Ver catálogo <ArrowRight className="inline size-4" /></Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {categories.slice(0,8).map(node=><Link key={node.category.slug} href={`/categorias/${node.category.slug}`} className="group flex min-h-32 items-end rounded-sm border bg-muted/35 p-5 transition-colors hover:border-primary hover:bg-muted/60"><span className="font-medium tracking-tight group-hover:underline">{node.category.name}</span></Link>)}
+        </div>
+      </section>}
+
+      {featured.length > 0 && <section className="border-y bg-muted/20">
+        <div className="mx-auto w-full max-w-7xl px-5 py-14 md:px-8">
+          <div className="mb-7 flex items-end justify-between gap-4"><div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Escolhas especiais</p><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Destaques</h2></div><Link href="/produtos" className="text-sm font-medium hover:underline">Ver todos <ArrowRight className="inline size-4" /></Link></div>
           <ProductGrid products={featured} />
-        </section>
-      ) : null}
-
-      <section className="mx-auto w-full max-w-7xl px-4 pb-16">
-        <h2 className="mb-6 text-xl font-semibold tracking-tight">Categorias</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {categories.map((node) => (
-            <Link
-              key={node.category.slug}
-              href={`/categorias/${node.category.slug}`}
-              className="hover:bg-muted/60 rounded-lg border p-5 transition-colors"
-            >
-              <p className="font-medium">{node.category.name}</p>
-            </Link>
-          ))}
         </div>
-      </section>
+      </section>}
 
-      <section className="mx-auto w-full max-w-7xl px-4 pb-20">
-        <h2 className="mb-6 text-xl font-semibold tracking-tight">Novidades</h2>
+      <section className="mx-auto w-full max-w-7xl px-5 py-14 md:px-8">
+        <div className="mb-7 flex items-end justify-between gap-4"><div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Acabaram de chegar</p><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Novidades</h2></div><Link href="/produtos?sort=newest" className="text-sm font-medium hover:underline">Explorar catálogo <ArrowRight className="inline size-4" /></Link></div>
         <ProductGrid products={latest.items} />
       </section>
     </div>
