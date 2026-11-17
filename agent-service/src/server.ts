@@ -55,6 +55,14 @@ function authorized(req:IncomingMessage){
 }
 async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
  const method=req.method||"GET", path=url.pathname;
+ // Enforce same-origin on every state-changing admin action, including Meta signup routes.
+ if(method!=="GET" && method!=="HEAD") {
+  const origin=req.headers.origin;
+  const expected=new URL(config.PUBLIC_BASE_URL).origin;
+  if(origin && origin!==expected) return responseError(res,403,"Origem inválida.");
+  const fetchSite=req.headers["sec-fetch-site"];
+  if(fetchSite==="cross-site") return responseError(res,403,"Requisição entre sites não autorizada.");
+ }
  const signup=url.pathname.match(/^\/admin\/api\/stores\/([a-f0-9-]{36})\/meta\/(start|complete|disconnect)$/);
  if(signup){
   if(method!=="POST")return responseError(res,405,"Método inválido");
@@ -65,10 +73,6 @@ async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
   const result=await completeSignup(storeId,{state:String(body.state||""),code:String(body.code||""),wabaId:String(body.wabaId||""),phoneId:String(body.phoneId||""),pin:typeof body.pin==="string"?body.pin:undefined,coexistence:body.coexistence===true});
   if(result.storeId!==storeId) return responseError(res,403,"Loja não autorizada");
   return respondJson(res,200,result);
- }
- if(method!=="GET") {
-  const origin=req.headers.origin;
-  if(origin && origin!==new URL(config.PUBLIC_BASE_URL).origin && origin!==url.origin) return responseError(res,403,"Origem inválida.");
  }
  if(path==="/admin/api/stores"&&method==="GET"){
   const stores=await query<Store>("SELECT * FROM agent_stores ORDER BY name");
