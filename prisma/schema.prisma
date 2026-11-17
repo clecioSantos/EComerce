@@ -31,6 +31,7 @@ model Store {
   carts    Cart[]
   orders   Order[]
   agents   AgentApiCredential[]
+  checkoutLinks AgentCheckoutSession[]
 
   @@map("stores")
 }
@@ -48,6 +49,21 @@ model AgentApiCredential {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
   @@index([storeId])
   @@map("agent_api_credentials")
+}
+
+model AgentCheckoutSession {
+  id         String   @id @default(cuid())
+  storeId    String
+  cartId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cart  Cart  @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  @@index([storeId, expiresAt])
+  @@map("agent_checkout_sessions")
 }
 
 model User {
@@ -483,6 +499,7 @@ model Cart {
 
   user  User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   items CartItem[]
+  checkoutLinks AgentCheckoutSession[]
 
   @@index([userId])
   @@map("carts")
