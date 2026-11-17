@@ -6,6 +6,7 @@ import { encrypt, safeEqual, validMetaSignature } from "./security.js";
 import { renderDashboard } from "./dashboard.js";
 import { respond } from "./ai.js";
 import { sendText, transcribeAudio } from "./whatsapp.js";
+import { prepareSignup, completeSignup, disconnectSignup } from "./meta-signup.js";
 
 type Json = Record<string, unknown>;
 const storeInputs = (o:Json) => ({
@@ -22,8 +23,9 @@ function ensureStoreInput(x: ReturnType<typeof storeInputs>, creating:boolean) {
  const url=new URL(x.storeUrl);
  if (!["https:","http:"].includes(url.protocol) ||
      (url.protocol==="http:" && url.hostname!=="localhost")) throw Error("Informe URL HTTPS da loja.");
- if (!x.name || !/^\d{6,25}$/.test(x.phoneId) || !/^\d{8,16}$/.test(x.whatsappNumber)) throw Error("Nome ou identificação do WhatsApp inválidos.");
- if (creating&&(!x.whatsappToken||!x.commerceKey))throw Error("As duas chaves são obrigatórias no cadastro.");
+ if (!x.name || (x.phoneId && !/^\d{6,25}$/.test(x.phoneId)) || (x.whatsappNumber && !/^\d{8,16}$/.test(x.whatsappNumber))) throw Error("Nome ou identificação do WhatsApp inválidos.");
+ if (creating&&!x.commerceKey)throw Error("A chave da API comercial é obrigatória no cadastro.");
+ if (x.enabled && (!x.phoneId || !x.whatsappNumber || !x.whatsappToken)) throw Error("Conecte ou configure o WhatsApp antes de ativar.");
  if (x.preferences.instructions && String(x.preferences.instructions).length>1500)throw Error("Orientações muito extensas.");
  if (x.preferences.tone && String(x.preferences.tone).length>100)throw Error("Tom inválido.");
  if (!["true","false"].includes(String(x.enabled)))throw Error("Status inválido.");
@@ -52,6 +54,17 @@ function authorized(req:IncomingMessage){
 }
 async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
  const method=req.method||"GET", path=url.pathname;
+ const signup=url.pathname.match(/^\/admin\/api\/stores\/([a-f0-9-]{36})\/meta\/(start|complete|disconnect)$/);
+ if(signup){
+  if(method!=="POST")return responseError(res,405,"Método inválido");
+  const storeId=signup[1],action=signup[2];
+  if(action==="start")return respondJson(res,200,await prepareSignup(storeId));
+  if(action==="disconnect")return respondJson(res,200,await disconnectSignup(storeId));
+  const body=await requestJson(req);
+  const result=await completeSignup({state:String(body.state||""),code:String(body.code||""),wabaId:String(body.wabaId||""),phoneId:String(body.phoneId||""),pin:typeof body.pin==="string"?body.pin:undefined,coexistence:body.coexistence===true});
+  if(result.storeId!==storeId) return responseError(res,403,"Loja não autorizada");
+  return respondJson(res,200,result);
+ }
  if(method!=="GET") {
   const origin=req.headers.origin;
   if(origin && origin!==new URL(config.PUBLIC_BASE_URL).origin && origin!==url.origin) return responseError(res,403,"Origem inválida.");
@@ -68,7 +81,7 @@ async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
       emojis:input.preferences.emojis!==false,upsell:input.preferences.upsell!==false})];
   if(creating){
    await query("INSERT INTO agent_stores(id,name,store_url,whatsapp_phone_id,whatsapp_number,enabled,preferences,commerce_api_key_enc,whatsapp_token_enc) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-    [id,...values,encrypt(input.commerceKey),encrypt(input.whatsappToken)]);
+    [id,...values,encrypt(input.commerceKey),input.whatsappToken?encrypt(input.whatsappToken):""]);
   }else{
    const r=await pool.query("UPDATE agent_stores SET name=$2,store_url=$3,whatsapp_phone_id=$4,whatsapp_number=$5,enabled=$6,preferences=$7,commerce_api_key_enc=COALESCE($8,commerce_api_key_enc),whatsapp_token_enc=COALESCE($9,whatsapp_token_enc),updated_at=now() WHERE id=$1",
     [id,...values,input.commerceKey?encrypt(input.commerceKey):null,input.whatsappToken?encrypt(input.whatsappToken):null]);
@@ -127,7 +140,7 @@ async function webhook(req:IncomingMessage,res:ServerResponse,url:URL){
 }
 async function handleInbound(row:{id:string;store_phone_id:string;sender:string;event:MetaMessage}){
  const [store]=await query<Store>("SELECT * FROM agent_stores WHERE whatsapp_phone_id=$1",[row.store_phone_id]);
- if(!store||!store.enabled)return;
+ if(!store||!store.enabled||!store.whatsapp_token_enc)return;
  const message=row.event;
  let text=message.type==="text"?(message.text?.body||""):message.audio?.id?await transcribeAudio(store,message.audio.id):"";
  text=text.trim().slice(0,3000);if(!text)return;
