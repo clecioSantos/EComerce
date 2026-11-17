@@ -1,80 +1,88 @@
-# Agente de vendas no painel da loja
+# Agente de vendas na Hostinger — uma aplicação Node.js
 
-## Interface
+## Arquitetura unificada
 
-O administrador autenticado acessa **Administração → Agente de vendas** ou **Configurações → Configurar agente**.
+A aplicação Next.js e o agente de WhatsApp usam o **mesmo processo Node.js** e **a mesma porta** da aplicação Hostinger. Não é necessário reservar outra vaga Node, outra aplicação, outro domínio ou outro banco PostgreSQL.
 
-A integração usa server actions do Next.js e uma vinculação interna entre `stores.agentServiceId` e o serviço independente de agentes. **Não** embute o painel independente em iframe, nem expõe seu `ADMIN_PASSWORD` no navegador. O lojista visualiza e administra somente o agente da loja atual.
+- `npm run build` continua compilando o Next.js com Webpack.
+- `npm start` agora usa `node --import tsx server.mjs`.
+- `server.mjs` cria o servidor Next.js, hospeda `/api/webhooks/whatsapp` e inicializa o worker de mensagens com timer no mesmo processo.
+- Todas as tabelas de atendimento do agente ficam no **PostgreSQL já usado pela loja**, com nomes `agent_*`, criadas na migração Prisma `20261117000400_embedded_agent_tables`.
+- O painel **Administração → Agente de vendas** usa apenas chamadas de servidor, que acessam uma API interna via loopback `127.0.0.1:PORT`. A API recusa conexões remotas antes de processar qualquer solicitação.
+- As credenciais comerciais geradas pelo painel continuam associadas à loja `legacy-store`; não são compartilhadas com outros lojistas.
+- As respostas recebidas da Meta são confirmadas por HMAC antes do enfileiramento. O worker processa a fila persistida no PostgreSQL com tentativas e controle de falhas.
 
-Funcionalidades:
-- Cadastro do agente (cria automaticamente uma chave de API comercial exclusiva e armazena apenas seu SHA-256 no banco da loja).
-- Configuração de tom de voz, orientações, emojis e sugestões de complementos.
-- Conexão manual da WhatsApp Cloud API (número, Phone Number ID e token) ou Meta Embedded Signup V4.
-- Ativar/desativar atendimento automático.
-- Ver conversas e alternar, com verificação de propriedade, entre atendimento humano e IA.
+`agent-service/src/standalone.ts` continua existindo **somente para compatibilidade** com instalações antigas em servidor separado; não é usado no deploy Hostinger unificado.
 
-**Limitação atual:** a vitrine principal ainda está vinculada à loja `legacy-store`. O painel serve a essa loja; múltiplas lojas e checkout multitenant em produção continuam bloqueados até a auditoria de isolamento.
+## 1. Migrar o banco existente
 
-## Passo 1: atualizar banco do EComerce
-
-A migração `20261117000300_store_agent_binding` acrescenta a coluna opcional `stores.agentServiceId`.
-
-Faça backup e execute, com `DIRECT_URL` apontando para o banco de destino:
+Faça backup e execute **uma vez**, conectado ao PostgreSQL correto (mesmo valor de `DIRECT_URL` usado nas migrações da loja):
 
 ```sh
+npx prisma migrate status
 npx prisma migrate deploy
 ```
 
-Não execute `prisma migrate reset` nem o seed destrutivo.
+As migrações pendentes `20261117000300_store_agent_binding` e `20261117000400_embedded_agent_tables` são aditivas, não apagam produtos, pedidos, clientes ou pagamentos. **Não use `prisma migrate reset` nem `prisma/seed.ts`**.
 
-## Passo 2: implantar o agent-service separadamente
+## 2. Configurar a mesma aplicação na Hostinger
 
-O servidor da loja (Next.js) e o processo do WhatsApp **são dois apps Node independentes**. Na Hostinger, implante `agent-service/` como uma segunda aplicação Node, com domínio HTTPS próprio, por exemplo `https://agente.exemplo.com`. Essa URL deve chegar à porta definida em `PORT` (padrão 3100) do processo do agente. Configure persistência e reinicialização do processo, pois ele recebe webhooks e processa a fila.
+Mantenha como diretório raiz a **raiz do repositório EComerce**, não `agent-service/`.
 
-Dentro do diretório `agent-service`:
+Comando de build: `npm run build`  
+Comando de inicialização: `npm start`  
+Porta: a `PORT` fornecida pela Hostinger (o aplicativo usa `3000` como fallback).
 
-```sh
-npm install
-npm run typecheck
-npm run start
-```
-
-Use um **PostgreSQL separado** para o agente. Execute o conteúdo de `agent-service/schema.sql` nesse banco antes de iniciar; para instalações antigas, também aplique `agent-service/migrations/002_embedded_signup.sql`. **Não use o seed nem o banco da loja para as tabelas `agent_*`**.
-
-Variáveis no servidor do agente, conforme `agent-service/.env.example`:
-- `DATABASE_URL`: PostgreSQL próprio do agente.
-- `MASTER_ENCRYPTION_KEY`: 32 bytes em hexadecimal, para cifrar tokens.
-- `ADMIN_PASSWORD`: senha forte (16+ caracteres), compartilhada apenas com o backend do EComerce.
-- `PUBLIC_BASE_URL`: endereço HTTPS próprio do agente.
-- `OPENAI_API_KEY` e `OPENAI_MODEL`: credenciais e modelo usado nas respostas.
-- `META_APP_ID`, `META_CONFIG_ID`, `META_APP_SECRET`, `META_VERIFY_TOKEN` e `META_GRAPH_VERSION`.
-- `ALLOWED_COMMERCE_HOSTS`: hostname público HTTPS da loja, sem protocolo, por exemplo `loja.exemplo.com`.
-
-O app precisa de registro e permissões adequados na Meta. Configure `https://agente.exemplo.com/webhook/whatsapp` e assinatura de eventos `messages`; os domínios Meta autorizados devem incluir a origem HTTPS da loja onde roda o SDK.
-
-## Passo 3: configurar o Next.js da loja
-
-Defina na **aplicação EComerce** (não como variáveis `NEXT_PUBLIC_*`, exceto a URL pública):
+Configure na **mesma aplicação**:
 
 ```env
-NEXT_PUBLIC_SITE_URL=https://loja.exemplo.com
-AGENT_SERVICE_URL=https://agente.exemplo.com
-AGENT_ADMIN_PASSWORD=mesma-senha-forte-do-agent-service
+AGENT_EMBEDDED=true
+NEXT_PUBLIC_SITE_URL=https://loja.seudominio.com
+AGENT_ADMIN_PASSWORD=uma-senha-longa-de-16-caracteres-ou-mais
+MASTER_ENCRYPTION_KEY=64-caracteres-hexadecimais
+META_APP_ID=identificador-do-aplicativo-meta
+META_CONFIG_ID=identificador-do-embedded-signup
+META_APP_SECRET=segredo-do-app-meta
+META_VERIFY_TOKEN=seu-token-de-verificacao-de-webhook
+META_GRAPH_VERSION=v23.0
+OPENAI_API_KEY=sua-chave-openai
+OPENAI_MODEL=gpt-4.1-mini
+ALLOWED_COMMERCE_HOSTS=loja.seudominio.com
 ```
 
-Reinicie ambos os processos. Em **Administração → Agente de vendas**, clique **Cadastrar agente** com o atendimento desativado. Isso cria uma credencial comercial automaticamente; nenhuma chave precisa ser copiada manualmente.
+Mantenha as variáveis já existentes da loja: `DATABASE_URL`, `AUTH_SECRET`, Mercado Pago, frete etc. Em modo integrado, `DATABASE_URL` é **compartilhada**; não é necessário banco separado nem `AGENT_SERVICE_URL`. Não configure `PUBLIC_BASE_URL` para outro domínio — por padrão, o agente usa `NEXT_PUBLIC_SITE_URL`.
 
-Após o cadastro:
-1. Clique **Conectar pela Meta** e conclua o Embedded Signup; ou informe número com DDI, Phone Number ID, token oficial e salve.
-2. Ative o atendimento apenas após confirmar a conexão e testar o webhook.
-3. Ajuste as orientações de vendas da loja.
-4. Envie mensagens de um número de teste e veja **Atendimentos**, incluindo a opção de assumir atendimento.
+Gere a chave AES com `openssl rand -hex 32` ou o equivalente PowerShell. **Não comite credenciais no GitHub, nem use `NEXT_PUBLIC_` para segredos.**
 
-## Cuidados
+Se alguma das variáveis indispensáveis estiver ausente, o servidor mantém a **loja funcionando**, mas não inicia o agente; um aviso aparece nos logs e a tela administrativa informa indisponibilidade.
 
-- Meta e OpenAI exigem contas e credenciais válidas. O deploy da `main` isoladamente **não** inicia o serviço do agente, nem conecta o WhatsApp.
-- Os tokens de WhatsApp são mantidos cifrados no banco do agente, e não retornam à interface.
-- Nunca coloque `ADMIN_PASSWORD`, `OPENAI_API_KEY` ou tokens Meta em `NEXT_PUBLIC_*`.
-- Se `AGENT_SERVICE_URL` ou `AGENT_ADMIN_PASSWORD` estiverem ausentes, a tela indica que a configuração do servidor está pendente e impede salvar.
-- Esta integração não elimina os riscos de autenticação global do dashboard independente; o painel da loja usa autenticação de administrador e verifica o vínculo da conversa antes de alterar o modo.
-- Verifique o build, o serviço, o webhook e a operação real com Meta antes de oferecer o recurso comercialmente.
+## 3. Configurar a Meta
+
+Na Meta for Developers, habilite WhatsApp Cloud API + Embedded Signup e configure o webhook no **mesmo domínio da loja**:
+
+```text
+https://loja.seudominio.com/api/webhooks/whatsapp
+```
+
+Use o valor de `META_VERIFY_TOKEN` como Verify Token; assine o campo `messages`. O token de acesso do WhatsApp pertence ao número e pode ser configurado pelo painel; `META_APP_SECRET` e `OPENAI_API_KEY` ficam apenas no backend.
+
+O Meta Embedded Signup exige configuração de domínio/origem OAuth e permissões de WhatsApp aprovadas pela Meta. Sem essas permissões, o cadastro por SDK não finaliza mesmo com o servidor funcionando.
+
+## 4. Administrar o agente
+
+Entre como administrador da loja, acesse **Administração → Agente de vendas**.
+
+1. Configure personalidade, instruções de atendimento e preferências.
+2. Cadastre o agente inicialmente **desativado**. O backend cria automaticamente a credencial comercial e vincula o agente à loja.
+3. Escolha **Conectar pela Meta** e **Autorizar na Meta**, ou informe o número, Phone Number ID e token manualmente.
+4. Confirme a conexão antes de ativar o atendimento.
+5. Envie uma mensagem de outro número para testar. Em **Atendimentos**, consulte mensagens, assuma a conversa e devolva à IA.
+
+## Validação e limitações
+
+- Verifique em uma aplicação rodando: `GET /api/webhooks/whatsapp` sem verify token deve retornar **403** (agente ativo) ou **503** (agente não configurado).
+- O painel `/admin/agente` exige login de administrador. O caminho `/__internal/agent/admin/api/*` aceita **apenas loopback** e ainda exige autenticação Basic no servidor. Não configure proxy público para expor essas rotas.
+- O worker depende de processo Node persistente, disponível no ambiente informado. Em escalonamento horizontal com várias instâncias, a fila usa `FOR UPDATE SKIP LOCKED`, mas a aplicação deve ser monitorada.
+- O Next.js **não deve** ser iniciado por `next start` diretamente nesta arquitetura. Isso abre a loja mas não inicia o webhook/worker integrado.
+- O worker herda regras de fila e retry do serviço anterior. Integração ponta a ponta com a Meta só pode ser concluída após credenciais, conexão real e teste de mensagens.
+- O isolamento multiloja da loja virtual ainda precisa de auditoria completa para produção com várias lojas.
