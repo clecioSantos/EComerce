@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Store } from "./db.js";
+import { validateCommerceUrl } from "./commerce-security.js";
 import { generateGemini, outputText, type GeminiContent, type GeminiPart } from "./gemini.js";
 import { getProduct, searchProducts, generateCheckout, listProducts } from "./commerce.js";
 
@@ -19,7 +20,8 @@ const detailArgs = z.object({produto_id:z.string().min(1).max(100)});
 const shareArgs = z.object({produto_ids:z.array(z.string().min(1).max(100)).min(1).max(3)});
 export type AgentReply = { text:string; productLinks:string[] };
 const productLink = (store: Store, slug: string): string => {
- const url=new URL(store.store_url);
+ const url=validateCommerceUrl(store.store_url);
+ if (!slug.trim() || /[\\/?#]/.test(slug) || slug === "." || slug === "..") throw new Error("Invalid product slug");
  url.pathname="/produtos/"+encodeURIComponent(slug);
  return url.toString();
 };
@@ -88,6 +90,7 @@ export async function respond(store: Store, history: {role:string;text:string}[]
     const result=z.object({product:z.object({id:z.string(),slug:z.string().min(1),image:z.string().nullable().optional(),status:z.string()})}).parse(await getProduct(store,id));
     if(result.product.id!==id||result.product.status!=="ACTIVE") {unavailable.push(id);continue;}
     const link=productLink(store,result.product.slug);
+    if (!shared.has(id) && shared.size >= 3) { unavailable.push(id); continue; }
     if(!shared.has(id)) shared.set(id,link);
     links.push(link);
    }catch {unavailable.push(id);}
