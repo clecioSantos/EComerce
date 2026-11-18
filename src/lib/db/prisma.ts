@@ -8,7 +8,7 @@ import { getEnv } from "@/lib/env";
 function createPrismaClient() {
   const adapter = new PrismaPg({
     connectionString: getEnv().DATABASE_URL,
-    max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+    max: Math.min(5, Math.max(1, Number(process.env.DATABASE_POOL_MAX ?? 3) || 3)),
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
   });
