@@ -53,6 +53,38 @@ function authorized(req:IncomingMessage){
   const colon=decoded.indexOf(":");return colon>=0&&safeEqual(decoded.slice(colon+1),config.ADMIN_PASSWORD);
  }catch{return false;}
 }
+/**
+ * Trusted in-process admin entry point for the embedded Next.js integration.
+ * This is never exposed as an HTTP route. Next server actions enforce requireAdmin()
+ * before calling the agent service, and adminApi retains payload/origin validation.
+ */
+export async function executeEmbeddedAgentAdmin(
+ path:string, method="GET", payload?:object,
+):Promise<{status:number;body:unknown}> {
+ if (!path.startsWith("/") || path.startsWith("//") || path.includes("..")) throw Error("Rota do agente inválida.");
+ const { Readable } = await import("node:stream");
+ const input = payload === undefined ? [] : [Buffer.from(JSON.stringify(payload))];
+ const req = Readable.from(input) as unknown as IncomingMessage;
+ const headers: Record<string,string> = {};
+ req.method=method;
+ req.headers=headers;
+ if (payload !== undefined) {
+  headers.origin=new URL(config.PUBLIC_BASE_URL).origin;
+  headers["content-type"]="application/json";
+ }
+ let status=200;
+ let responseBody="";
+ const res = {
+  writeHead(code:number) {status=code;return this;},
+  end(chunk?:string|Buffer) {if(chunk!==undefined)responseBody+=Buffer.isBuffer(chunk)?chunk.toString("utf8"):String(chunk);return this;},
+ } as unknown as ServerResponse;
+ const url=new URL("/admin/api"+path,config.PUBLIC_BASE_URL);
+ await adminApi(req,res,url);
+ let body:unknown;
+ try {body=JSON.parse(responseBody);} catch {body={error:"Resposta inválida do serviço integrado."};}
+ return {status,body};
+}
+
 async function adminApi(req:IncomingMessage,res:ServerResponse,url:URL) {
  const method=req.method||"GET", path=url.pathname;
  // Enforce same-origin on every state-changing admin action, including Meta signup routes.
