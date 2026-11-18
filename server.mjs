@@ -14,7 +14,7 @@ const handleNext = app.getRequestHandler();
 let agent = null;
 if (process.env.AGENT_EMBEDDED === "true") {
   const required = ["DATABASE_URL", "MASTER_ENCRYPTION_KEY", "AGENT_ADMIN_PASSWORD",
-    "META_APP_SECRET", "META_VERIFY_TOKEN", "OPENAI_API_KEY", "NEXT_PUBLIC_SITE_URL"];
+    "META_APP_SECRET", "META_VERIFY_TOKEN", "GEMINI_API_KEY", "NEXT_PUBLIC_SITE_URL"];
   const missing = required.filter(name => !process.env[name]);
   if (missing.length) {
     console.warn("[agent] desativado: faltam variáveis: " + missing.join(", "));
