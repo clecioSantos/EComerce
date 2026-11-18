@@ -15,7 +15,7 @@ export type GeminiResponse = {
 
 export async function generateGemini(
  contents: GeminiContent[],
- options: { systemInstruction?: string; tools?: object[]; maxOutputTokens?: number; timeoutMs?: number } = {},
+ options: { systemInstruction?: string; tools?: object[]; maxOutputTokens?: number; timeoutMs?: number; toolMode?: "NONE" } = {},
 ): Promise<GeminiContent> {
  const controller = new AbortController();
  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 30000);
@@ -30,6 +30,7 @@ export async function generateGemini(
      contents,
      ...(options.systemInstruction ? { systemInstruction: { parts: [{ text: options.systemInstruction }] } } : {}),
      ...(options.tools ? { tools: options.tools } : {}),
+     ...(options.toolMode ? { toolConfig: { functionCallingConfig: { mode: options.toolMode } } } : {}),
      generationConfig: { maxOutputTokens: options.maxOutputTokens ?? 768 },
     }),
     signal: controller.signal,
