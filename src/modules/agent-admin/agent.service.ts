@@ -229,9 +229,15 @@ export async function getAgentState(): Promise<AgentState> {
   } catch (error) {
     const diagnostic = agentDiagnostic(error);
     // Never log credentials, authorization headers or full URLs.
+    // Only emit a bounded error category; never log credential values or connection URLs.
+    const errorMessage = error instanceof Error ? error.message : "";
+    const detail = /Cannot find module|Cannot read properties|is not a function|Max clients reached|EMAXCONNSESSION|pool_size/i.test(errorMessage)
+      ? errorMessage.slice(0, 140).replace(/postgres(?:ql)?:\/\/\S+/gi, "[database-url]")
+      : undefined;
     console.error("[agent-admin] healthcheck failed", {
       code: diagnostic.code, errorName: diagnostic.errorName,
       ...(diagnostic.causeCode ? { causeCode: diagnostic.causeCode } : {}),
+      ...(detail ? { detail } : {}),
     });
     return {
       ...fallback, configured: true, serviceAvailable: false,
