@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { handleAgentRequest, startAgentWorker } from "../../../../../agent-service/src/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +11,8 @@ async function handle(request: Request): Promise<Response> {
   }
 
   try {
+    // Avoid parsing production-only secrets during Next.js build-time route discovery.
+    const { handleAgentRequest, startAgentWorker } = await import("../../../../../agent-service/src/server");
     const url = new URL(request.url);
     const headers = Object.fromEntries(request.headers.entries());
     const body = request.method === "POST"
