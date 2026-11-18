@@ -16,7 +16,7 @@ Object.assign(process.env, {
 const { generateGemini, outputText } = await import("./gemini.js");
 const { respond } = await import("./ai.js");
 const { encrypt } = await import("./security.js");
-const { transcribeAudio } = await import("./whatsapp.js");
+const { transcribeAudio, sendText } = await import("./whatsapp.js");
 
 test("Gemini requests use x-goog-api-key and generateContent, never OpenAI", async () => {
  const original=globalThis.fetch;
@@ -176,5 +176,33 @@ test("Gemini shares only verified canonical product links, up to three",async()=
   const reply=await respond(store,[{role:"user",text:"Me manda fotos dos vestidos"}]);
   assert.equal(reply.text,"Veja estas opções.");
   assert.deepEqual(reply.productLinks,["https://store-a.example.com/produtos/vestido-aurora"]);
+ } finally {globalThis.fetch=original;}
+});
+
+test("sharing across several Gemini tool calls never exceeds three products", async () => {
+ const original=globalThis.fetch;
+ let step=0;
+ globalThis.fetch=async(input)=>{
+  const url=String(input);
+  if(url.includes("generativelanguage.googleapis.com")) {
+   step++;
+   const parts=step===1 ? [1,2].map(batch=>({functionCall:{name:"compartilhar_produtos",args:{produto_ids:[1,2,3].map(i=>"p"+(i+(batch-1)*3))}}})) : [{text:"Confira as opções."}];
+   return Response.json({candidates:[{content:{role:"model",parts}}]});
+  }
+  if(url.includes("?limit=30")) return Response.json({products:[]});
+  const id=url.split("/").pop()!;
+  return Response.json({product:{id,slug:"slug-"+id,status:"ACTIVE",image:null}});
+ };
+ try {
+  const store={id:"a",name:"Loja",store_url:"https://store-a.example.com",commerce_api_key_enc:encrypt("key"),whatsapp_phone_id:"12345678",whatsapp_number:"5511999999999",whatsapp_token_enc:encrypt("test-token"),enabled:true,preferences:{}};
+  const reply=await respond(store,[{role:"user",text:"Quero opções"}]);
+  assert.deepEqual(reply.productLinks,[1,2,3].map(i=>"https://store-a.example.com/produtos/slug-p"+i));
+  let sentBody="";
+  globalThis.fetch=async(_input,init)=>{sentBody=String(init?.body);return Response.json({messages:[{id:"test"}]});};
+  await sendText(store,"5511999999999",reply.productLinks[0]);
+  const payload=JSON.parse(sentBody) as {type:string;text:{preview_url:boolean;body:string};image?:unknown};
+  assert.equal(payload.type,"text");
+  assert.deepEqual(payload.text,{preview_url:true,body:reply.productLinks[0]});
+  assert.equal(payload.image,undefined);
  } finally {globalThis.fetch=original;}
 });

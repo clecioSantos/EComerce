@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Keep OG tags in the initial head for every WhatsApp/Meta crawler variant.
+  htmlLimitedBots: /.*/,
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "picsum.photos" },

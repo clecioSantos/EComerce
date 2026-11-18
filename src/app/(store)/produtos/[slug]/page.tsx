@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { productMetadata } from "@/lib/product-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -20,31 +21,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return { title: "Produto não encontrado" };
+  if (!product || product.status !== "ACTIVE")
+    return { robots: { index: false }, title: "Produto não encontrado" };
 
-  const base = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000");
-  const canonical = new URL("/produtos/" + encodeURIComponent(product.slug), base).toString();
-  // WhatsApp's link preview crawler requires a publicly accessible absolute image URL.
-  const image = product.image ? new URL(product.image, base).toString() : null;
-  const description = product.shortDescription ?? product.description ?? product.name;
-  return {
-    title: product.name,
-    description,
-    alternates: { canonical },
-    openGraph: {
-      title: product.name,
-      description,
-      type: "website",
-      url: canonical,
-      images: image ? [{ url: image, alt: product.name }] : undefined,
-    },
-    twitter: {
-      card: image ? "summary_large_image" : "summary",
-      title: product.name,
-      description,
-      images: image ? [image] : undefined,
-    },
-  };
+  return productMetadata(product);
 }
 
 export default async function ProductPage({
@@ -54,7 +34,7 @@ export default async function ProductPage({
 }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) notFound();
+  if (!product || product.status !== "ACTIVE") notFound();
 
   const [reviews, rating, related] = await Promise.all([
     listProductReviews(product.id),
@@ -167,9 +147,7 @@ export default async function ProductPage({
 
       {reviews.length > 0 ? (
         <section className="mt-14">
-          <h2 className="mb-4 text-xl font-semibold tracking-tight">
-            Avaliações
-          </h2>
+          <h2 className="mb-4 text-xl font-semibold tracking-tight">Avaliações</h2>
           <div className="grid gap-4 md:grid-cols-2">
             {reviews.map((review) => (
               <div key={review.id} className="rounded-lg border p-4">
@@ -181,9 +159,7 @@ export default async function ProductPage({
                   <p className="mt-1 text-sm font-medium">{review.title}</p>
                 ) : null}
                 {review.comment ? (
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    {review.comment}
-                  </p>
+                  <p className="text-muted-foreground mt-1 text-sm">{review.comment}</p>
                 ) : null}
               </div>
             ))}
