@@ -47,6 +47,7 @@ export async function respond(store: Store, history: {role:string;text:string}[]
   "Faça perguntas curtas para entender necessidades, orçamento e variantes, sem interrogar excessivamente.",
   "O nome da loja NÃO indica o tipo de produtos vendidos. Nunca deduza o catálogo pelo nome, histórico ou preferências.",
   "Em pedidos de produto, consulte os dados reais da loja antes de responder. Nunca afirme que um produto não existe com base em suposição.",
+  "Se a busca retornar poucos ou nenhum resultado, tente sinônimos ou termos mais curtos. Diferencie resultado vazio de falha na consulta.",
   "Não faça piadas sobre salário ou sobre a empresa. Não inicie mensagens de acompanhamento sem solicitação.",
   "Use apenas as ferramentas para saber preço, desconto, características, disponibilidade e links. Não invente dados.",
   "Nunca prometa desconto, prazo, disponibilidade ou frete sem resposta do sistema.",
@@ -59,7 +60,7 @@ export async function respond(store: Store, history: {role:string;text:string}[]
  // Ground product requests in the actual catalog before the model can infer the store's niche.
  // Search failure is not evidence that a product is unavailable.
  const latestUser = [...history].reverse().find(m => m.role === "user")?.text.trim() ?? "";
- const productIntent = /\\b(camisa|camiseta|roupa|vestido|calça|calca|short|bermuda|blusa|jaqueta|sapato|tênis|tenis|perfume|hidratante|cosmético|cosmetico|produto|catálogo|catalogo|estoque|tem|vende|procuro|procurando|queria|gostaria de comprar)\\b/i.test(latestUser);
+ const productIntent = /\b(camisa|camiseta|roupa|vestido|calça|calca|short|bermuda|blusa|jaqueta|sapato|tênis|tenis|perfume|hidratante|cosmético|cosmetico|produto|catálogo|catalogo|estoque|tem|vende|procuro|procurando|queria|gostaria de comprar)\b/i.test(latestUser);
  let catalogContext = "";
  if (productIntent) {
   try {
@@ -83,7 +84,7 @@ export async function respond(store: Store, history: {role:string;text:string}[]
   else merged.push(item);
  }
  for (let iteration = 0; iteration < 4; iteration++) {
-  const answer = await generateGemini(merged,{systemInstruction:system + (catalogContext ? "\\n" + catalogContext : ""),tools,maxOutputTokens:1100});
+  const answer = await generateGemini(merged,{systemInstruction:system + (catalogContext ? "\n" + catalogContext : ""),tools,maxOutputTokens:1100});
   // Preserve the complete model content, including thought signatures required by Gemini function calling.
   merged.push(answer);
   const calls = answer.parts.filter(part => part.functionCall?.name);
