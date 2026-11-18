@@ -62,16 +62,20 @@ export async function executeEmbeddedAgentAdmin(
  path:string, method="GET", payload?:object,
 ):Promise<{status:number;body:unknown}> {
  if (!path.startsWith("/") || path.startsWith("//") || path.includes("..")) throw Error("Rota do agente inválida.");
- const { Readable } = await import("node:stream");
- const input = payload === undefined ? [] : [Buffer.from(JSON.stringify(payload))];
- const req = Readable.from(input) as unknown as IncomingMessage;
+ // A lightweight async-iterable request avoids Node stream module interop
+ // issues when Next.js bundles this module into a production Server Action.
  const headers: Record<string,string> = {};
- req.method=method;
- req.headers=headers;
  if (payload !== undefined) {
   headers.origin=new URL(config.PUBLIC_BASE_URL).origin;
   headers["content-type"]="application/json";
  }
+ const req = {
+  method,
+  headers,
+  async *[Symbol.asyncIterator](): AsyncGenerator<Buffer> {
+   if (payload !== undefined) yield Buffer.from(JSON.stringify(payload));
+  },
+ } as unknown as IncomingMessage;
  let status=200;
  let responseBody="";
  const res = {
