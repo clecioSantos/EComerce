@@ -148,31 +148,81 @@ function publicSettings(store: RemoteStore): AgentSettingsInput {
   };
 }
 
+function agentDiagnostic(error: unknown): { code: string; guidance: string; errorName: string; causeCode?: string } {
+  const e = error instanceof Error ? error : new Error("Unknown agent service failure");
+  const cause = (e as Error & { cause?: { code?: unknown } }).cause;
+  const causeCode = typeof cause?.code === "string" ? cause.code : undefined;
+  const message = e.message;
+  let code = "AGENT_UNEXPECTED_ERROR";
+  let guidance = "Falha inesperada ao consultar o agente. Consulte os logs do servidor usando o código de diagnóstico.";
+  if (message.includes("Senha administrativa")) {
+    code = "AGENT_AUTH_FAILED";
+    guidance = "O serviço recusou a autenticação (HTTP 401). Confira AGENT_ADMIN_PASSWORD e se a mesma senha está configurada no serviço.";
+  } else if (message.includes("recusou a origem")) {
+    code = "AGENT_ORIGIN_REJECTED";
+    guidance = "O serviço recusou a origem (HTTP 403). Confira NEXT_PUBLIC_SITE_URL e ALLOWED_COMMERCE_HOSTS.";
+  } else if (/operação \((\d{3})\)/.test(message)) {
+    const status = message.match(/operação \((\d{3})\)/)?.[1] ?? "unknown";
+    code = "AGENT_HTTP_" + status;
+    guidance = "O serviço retornou HTTP " + status + ". Consulte os logs da rota interna do agente na Hostinger.";
+  } else if (e.name === "TimeoutError" || e.name === "AbortError") {
+    code = "AGENT_TIMEOUT";
+    guidance = "A conexão com o agente excedeu 12 segundos. Confira se a rota interna iniciou e está acessível no servidor.";
+  } else if (e instanceof TypeError && /fetch|network/i.test(message)) {
+    code = "AGENT_CONNECTION_FAILED";
+    guidance = "Não foi possível estabelecer conexão com o serviço do agente. Confira PORT, AGENT_EMBEDDED e os logs de inicialização.";
+  } else if (message.includes("PORT") || message.includes("Porta interna")) {
+    code = "AGENT_INVALID_PORT";
+    guidance = "A porta interna do agente é inválida. Confira PORT e AGENT_EMBEDDED_PORT.";
+  } else if (message.includes("NEXT_PUBLIC_SITE_URL") || message.includes("URL pública") || message.includes("Endereço da loja")) {
+    code = "AGENT_SITE_URL_INVALID";
+    guidance = "Confira NEXT_PUBLIC_SITE_URL: use o endereço HTTPS público da loja.";
+  } else if (message.includes("AGENT_SERVICE_URL") || message.includes("endereço do serviço")) {
+    code = "AGENT_SERVICE_URL_INVALID";
+    guidance = "Confira AGENT_SERVICE_URL ou habilite AGENT_EMBEDDED=true para usar o serviço integrado.";
+  }
+  return { code, guidance, errorName: e.name, ...(causeCode ? { causeCode } : {}) };
+}
+
 export async function getAgentState(): Promise<AgentState> {
   const store = await ownStore();
   const fallback = { connected: Boolean(store.agentServiceId), settings: defaults, storeName: store.name };
   try {
     const configured = remoteConfig() !== null;
-    if (!configured) return {
-      ...fallback, configured: false, serviceAvailable: false,
-      reason: "Configure AGENT_EMBEDDED=true e as credenciais do agente na Hostinger, depois reinicie a aplicação.",
-    };
+    if (!configured) {
+      const missing = ["AGENT_ADMIN_PASSWORD", ...(process.env.AGENT_EMBEDDED === "true" ? [] : ["AGENT_SERVICE_URL"])].filter(name => !process.env[name]);
+      const code = "AGENT_CONFIG_MISSING";
+      console.error("[agent-admin] healthcheck failed", { code, missing });
+      return {
+        ...fallback, configured: false, serviceAvailable: false,
+        reason: "Diagnóstico " + code + ": falta configurar " + missing.join(", ") + ". Para serviço integrado, use AGENT_EMBEDDED=true; salve as variáveis e reinicie a aplicação.",
+      };
+    }
     // Also check the remote before displaying an enabled setup button.
     const available = await remote<{ stores: RemoteStore[] }>("/stores");
     if (!store.agentServiceId) return { ...fallback, configured: true, serviceAvailable: true };
     const remoteStore = available.stores.find(item => item.id === store.agentServiceId);
-    if (!remoteStore) return {
-      ...fallback, configured: true, serviceAvailable: false,
-      reason: "O cadastro vinculado não foi encontrado no serviço de agentes. Verifique o banco do agente.",
-    };
+    if (!remoteStore) {
+      console.error("[agent-admin] healthcheck failed", { code: "AGENT_STORE_NOT_FOUND" });
+      return {
+        ...fallback, configured: true, serviceAvailable: false,
+        reason: "Diagnóstico AGENT_STORE_NOT_FOUND: a loja está vinculada, mas o cadastro não foi encontrado no serviço. Confira o banco utilizado pelo agente.",
+      };
+    }
     return {
       connected: true, configured: true, serviceAvailable: true,
       settings: publicSettings(remoteStore), storeName: store.name,
     };
-  } catch {
+  } catch (error) {
+    const diagnostic = agentDiagnostic(error);
+    // Never log credentials, authorization headers or full URLs.
+    console.error("[agent-admin] healthcheck failed", {
+      code: diagnostic.code, errorName: diagnostic.errorName,
+      ...(diagnostic.causeCode ? { causeCode: diagnostic.causeCode } : {}),
+    });
     return {
       ...fallback, configured: true, serviceAvailable: false,
-      reason: "Não foi possível acessar o serviço do agente. Verifique as variáveis do agente, a migração do banco e os logs de inicialização.",
+      reason: "Diagnóstico " + diagnostic.code + ": " + diagnostic.guidance,
     };
   }
 }
