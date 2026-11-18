@@ -318,7 +318,13 @@ test("repeated checkout tool calls do not create duplicate links and cache reset
           { text: "O link de checkout está pronto para você concluir a compra na loja." },
         ]);
       return model([
-        call("criar_checkout", { itens: [{ variante_id: "v1", quantidade: 1 }] }),
+        call("criar_checkout", {
+          itens: [
+            ++requests % 2
+              ? { variante_id: "v1", quantidade: 1 }
+              : { quantidade: 1, variante_id: "v1" },
+          ],
+        }),
       ]);
     }
     if (url.endsWith("/checkout-links")) {
