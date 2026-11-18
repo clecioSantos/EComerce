@@ -48,7 +48,11 @@ test("sales agent completes Gemini function call and returns grounded response",
    ]}}]});
    return Response.json({candidates:[{content:{role:"model",parts:[{text:"Encontrei um vestido para você."}]}}]});
   }
-  if(address.includes("store-a.example.com/api/agent/v1/"))return Response.json({items:[{name:"Vestido elegante"}]});
+  if(address.includes("store-a.example.com/api/agent/v1/products?limit=30"))return Response.json({products:[{
+   id:"dress-1", name:"Vestido elegante", categoryName:"Vestidos", productTypeSlug:"roupas",
+   basePrice:749.9, currency:"BRL", inStock:true,
+  }]});
+  if(address.includes("store-a.example.com/api/agent/v1/"))return Response.json({products:[{id:"dress-1",name:"Vestido elegante"}]});
   throw Error("Unexpected network URL: "+address);
  };
  const store={id:"a",name:"Boutique",store_url:"https://store-a.example.com",
@@ -58,6 +62,8 @@ test("sales agent completes Gemini function call and returns grounded response",
   const answer=await respond(store,[{role:"user",text:"Quero um vestido"}]);
   assert.equal(answer,"Encontrei um vestido para você.");
   assert.equal(phase,2);
+  assert.match(lastRequest.systemInstruction.parts[0].text,/Vestido elegante/);
+  assert.match(lastRequest.systemInstruction.parts[0].text,/NUNCA deduza o tipo de mercadoria/);
   assert.equal(lastRequest.contents[1].role,"model");
   assert.equal(lastRequest.contents[1].parts[0].functionCall.name,"buscar_produtos");
   assert.equal(lastRequest.contents[2].parts[0].functionResponse.name,"buscar_produtos");
@@ -86,5 +92,54 @@ test("WhatsApp OGG is sent as inline audio to Gemini for transcription",async()=
   assert.equal(audioRequest.contents[0].parts[1].inlineData.mimeType,"audio/ogg");
   assert.equal(Buffer.from(audioRequest.contents[0].parts[1].inlineData.data,"base64").toString(),"mock-ogg-audio");
   assert.equal(called,3);
+ }finally{globalThis.fetch=original;}
+});
+
+test("brand suggesting perfume never overrides real clothing catalog",async()=>{
+ const original=globalThis.fetch;
+ let prompt="";
+ let inventoryCalls=0;
+ globalThis.fetch=async(input,init)=>{
+  const address=String(input);
+  if(address.includes("/api/agent/v1/products?limit=30")){
+   inventoryCalls++;
+   return Response.json({products:[{
+    id:"dress-1",name:"Vestido Midi Aurora",categoryName:"Vestidos",productTypeSlug:"roupas",
+    basePrice:649.9,currency:"BRL",inStock:true,
+   }]});
+  }
+  if(address.includes("generativelanguage.googleapis.com")){
+   prompt=JSON.parse(String(init?.body)).systemInstruction.parts[0].text;
+   return Response.json({candidates:[{content:{role:"model",parts:[{text:"Temos vestidos disponíveis."}]}}]});
+  }
+  throw Error("Unexpected network " + address);
+ };
+ try {
+  const store={id:"a",name:"Bonita de cheiro",store_url:"https://store-a.example.com",
+   commerce_api_key_enc:encrypt("internal-test-token"),whatsapp_phone_id:"12345678",
+   whatsapp_number:"5511999999999",whatsapp_token_enc:"",enabled:true,preferences:{}};
+  const reply=await respond(store,[{role:"user",text:"O que vocês vendem?"}]);
+  assert.equal(reply,"Temos vestidos disponíveis.");
+  assert.equal(inventoryCalls,1);
+  assert.match(prompt,/Vestido Midi Aurora/);
+  assert.match(prompt,/Bonita de cheiro/);
+  assert.match(prompt,/NUNCA deduza o tipo de mercadoria/);
+ } finally {globalThis.fetch=original;}
+});
+
+test("agent refuses to invent assortment when authenticated catalog is unavailable",async()=>{
+ const original=globalThis.fetch;
+ let geminiCalled=false;
+ globalThis.fetch=async(input)=>{
+  if(String(input).includes("generativelanguage.googleapis.com")){geminiCalled=true;throw Error("Gemini must not be called");}
+  return new Response(JSON.stringify({error:"Serviço indisponível"}),{status:503,headers:{"Content-Type":"application/json"}});
+ };
+ try {
+  const store={id:"a",name:"Bonita de cheiro",store_url:"https://store-a.example.com",
+   commerce_api_key_enc:encrypt("internal-test-token"),whatsapp_phone_id:"12345678",
+   whatsapp_number:"5511999999999",whatsapp_token_enc:"",enabled:true,preferences:{}};
+  const reply=await respond(store,[{role:"user",text:"Vocês vendem perfumes?"}]);
+  assert.match(reply,/não consegui consultar o catálogo/);
+  assert.equal(geminiCalled,false);
  }finally{globalThis.fetch=original;}
 });
