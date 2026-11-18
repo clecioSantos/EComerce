@@ -45,8 +45,8 @@ META_CONFIG_ID=identificador-do-embedded-signup
 META_APP_SECRET=segredo-do-app-meta
 META_VERIFY_TOKEN=seu-token-de-verificacao-de-webhook
 META_GRAPH_VERSION=v23.0
-OPENAI_API_KEY=sua-chave-openai
-OPENAI_MODEL=gpt-4.1-mini
+GEMINI_API_KEY=sua-chave-gemini
+GEMINI_MODEL=gemini-2.5-flash
 ALLOWED_COMMERCE_HOSTS=loja.seudominio.com
 ```
 
@@ -64,7 +64,7 @@ Na Meta for Developers, habilite WhatsApp Cloud API + Embedded Signup e configur
 https://loja.seudominio.com/api/webhooks/whatsapp
 ```
 
-Use o valor de `META_VERIFY_TOKEN` como Verify Token; assine o campo `messages`. O token de acesso do WhatsApp pertence ao número e pode ser configurado pelo painel; `META_APP_SECRET` e `OPENAI_API_KEY` ficam apenas no backend.
+Use o valor de `META_VERIFY_TOKEN` como Verify Token; assine o campo `messages`. O token de acesso do WhatsApp pertence ao número e pode ser configurado pelo painel; `META_APP_SECRET` e `GEMINI_API_KEY` ficam apenas no backend.
 
 O Meta Embedded Signup exige configuração de domínio/origem OAuth e permissões de WhatsApp aprovadas pela Meta. Sem essas permissões, o cadastro por SDK não finaliza mesmo com o servidor funcionando.
 
