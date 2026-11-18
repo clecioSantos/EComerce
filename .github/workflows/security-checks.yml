@@ -35,7 +35,7 @@ jobs:
           AGENT_ADMIN_PASSWORD: testing-agent-secret-1234
           META_APP_SECRET: test-app-secret
           META_VERIFY_TOKEN: test-verify-token
-          OPENAI_API_KEY: test-only-not-real
+          GEMINI_API_KEY: test-only-not-real
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
       - run: npm run typecheck
       - run: npm test
