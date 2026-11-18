@@ -45,7 +45,7 @@ const tones: AgentSettingsInput["tone"][] = [
 
 export function AgentManager({ initial }: { initial: AgentState }) {
   const [state, setState] = useState(initial);
-  const [form, setForm] = useState<AgentSettingsInput>(initial.settings);
+  const [form, setForm] = useState<AgentSettingsInput>({ ...initial.settings, enabled: initial.connected && initial.settings.enabled });
   const [busy, setBusy] = useState(false);
   const [metaReady, setMetaReady] = useState(false);
   const [notice, setNotice] = useState("");
@@ -70,7 +70,7 @@ export function AgentManager({ initial }: { initial: AgentState }) {
   async function save() {
     setBusy(true); setNotice(""); setError("");
     try {
-      const result = await saveAgentAction(form);
+      const result = await saveAgentAction({ ...form, enabled: state.connected && form.enabled });
       if (!result.ok) { setError(result.error); return; }
       setState(result.data);
       setForm({ ...result.data.settings, whatsappToken: "" });
@@ -254,9 +254,10 @@ export function AgentManager({ initial }: { initial: AgentState }) {
             <Input id="agent-token" type="password" autoComplete="new-password" placeholder="Deixe vazio para manter o token atual" value={form.whatsappToken} onChange={e => update({ whatsappToken: e.target.value })} />
           </div>
           <label className="flex items-center gap-3 rounded-lg border px-3 py-3 text-sm font-medium">
-            <input type="checkbox" checked={form.enabled} onChange={e=>update({ enabled: e.target.checked })}/>
+            <input type="checkbox" checked={state.connected && form.enabled} disabled={!state.connected || busy} onChange={e=>update({ enabled: e.target.checked })}/>
             Atendimento automático ativo
           </label>
+          {!state.connected && <p className="text-xs text-muted-foreground">Cadastre o agente primeiro. Depois você poderá habilitar o atendimento automático.</p>}
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={save} disabled={busy || !state.serviceAvailable}>{busy ? "Aguarde..." : state.connected ? "Salvar configurações" : "Cadastrar agente"}</Button>
             <Button type="button" variant="outline" onClick={metaReady ? authorizeMeta : connectMeta} disabled={busy || !state.connected || !state.serviceAvailable}>{metaReady ? "Autorizar na Meta" : "Conectar pela Meta"}</Button>
