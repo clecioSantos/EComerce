@@ -22,15 +22,27 @@ export async function generateMetadata({
   const product = await getProductBySlug(slug);
   if (!product) return { title: "Produto não encontrado" };
 
+  const base = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000");
+  const canonical = new URL("/produtos/" + encodeURIComponent(product.slug), base).toString();
+  // WhatsApp's link preview crawler requires a publicly accessible absolute image URL.
+  const image = product.image ? new URL(product.image, base).toString() : null;
+  const description = product.shortDescription ?? product.description ?? product.name;
   return {
     title: product.name,
-    description: product.shortDescription ?? product.description ?? undefined,
-    alternates: { canonical: `/produtos/${product.slug}` },
+    description,
+    alternates: { canonical },
     openGraph: {
       title: product.name,
-      description: product.shortDescription ?? undefined,
+      description,
       type: "website",
-      images: product.image ? [{ url: product.image }] : undefined,
+      url: canonical,
+      images: image ? [{ url: image, alt: product.name }] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: product.name,
+      description,
+      images: image ? [image] : undefined,
     },
   };
 }

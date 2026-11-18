@@ -201,8 +201,14 @@ async function handleInbound(row:{id:string;store_phone_id:string;sender:string;
  }
  const messages=await query<{role:string;text:string}>("SELECT role,text FROM (SELECT role,text,created_at FROM agent_messages WHERE conversation_id=$1 ORDER BY created_at DESC LIMIT 16) t ORDER BY created_at ASC",[conv.id]);
  const reply=await respond(store,messages);
- await sendText(store,row.sender,reply);
- await query("INSERT INTO agent_messages(id,conversation_id,role,text) VALUES($1,$2,'assistant',$3)",[randomUUID(),conv.id,reply]);
+ await sendText(store,row.sender,reply.text);
+ await query("INSERT INTO agent_messages(id,conversation_id,role,text) VALUES($1,$2,'assistant',$3)",[randomUUID(),conv.id,reply.text]);
+ // Each product gets a separate text message: WhatsApp shows an image-rich
+ // clickable link preview card instead of a detached photo attachment.
+ for(const link of reply.productLinks.slice(0,3)){
+  await sendText(store,row.sender,link);
+  await query("INSERT INTO agent_messages(id,conversation_id,role,text) VALUES($1,$2,'assistant',$3)",[randomUUID(),conv.id,link]);
+ }
 }
 let running=false;
 async function work(){

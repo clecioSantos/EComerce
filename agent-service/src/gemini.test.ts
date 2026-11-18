@@ -60,7 +60,8 @@ test("sales agent completes Gemini function call and returns grounded response",
   whatsapp_number:"5511999999999",whatsapp_token_enc:"",enabled:true,preferences:{}};
  try {
   const answer=await respond(store,[{role:"user",text:"Quero um vestido"}]);
-  assert.equal(answer,"Encontrei um vestido para você.");
+  assert.equal(answer.text,"Encontrei um vestido para você.");
+  assert.deepEqual(answer.productLinks,[]);
   assert.equal(phase,2);
   assert.match(lastRequest.systemInstruction.parts[0].text,/Vestido elegante/);
   assert.match(lastRequest.systemInstruction.parts[0].text,/NUNCA deduza o tipo de mercadoria/);
@@ -119,7 +120,7 @@ test("brand suggesting perfume never overrides real clothing catalog",async()=>{
    commerce_api_key_enc:encrypt("internal-test-token"),whatsapp_phone_id:"12345678",
    whatsapp_number:"5511999999999",whatsapp_token_enc:"",enabled:true,preferences:{}};
   const reply=await respond(store,[{role:"user",text:"O que vocês vendem?"}]);
-  assert.equal(reply,"Temos vestidos disponíveis.");
+  assert.equal(reply.text,"Temos vestidos disponíveis.");
   assert.equal(inventoryCalls,1);
   assert.match(prompt,/Vestido Midi Aurora/);
   assert.match(prompt,/Bonita de cheiro/);
@@ -139,7 +140,41 @@ test("agent refuses to invent assortment when authenticated catalog is unavailab
    commerce_api_key_enc:encrypt("internal-test-token"),whatsapp_phone_id:"12345678",
    whatsapp_number:"5511999999999",whatsapp_token_enc:"",enabled:true,preferences:{}};
   const reply=await respond(store,[{role:"user",text:"Vocês vendem perfumes?"}]);
-  assert.match(reply,/não consegui consultar o catálogo/);
+  assert.match(reply.text,/não consegui consultar o catálogo/);
   assert.equal(geminiCalled,false);
  }finally{globalThis.fetch=original;}
+});
+
+test("Gemini shares only verified canonical product links, up to three",async()=>{
+ const original=globalThis.fetch;
+ let step=0;
+ globalThis.fetch=async(input,init)=>{
+  const address=String(input);
+  if(address.includes("generativelanguage.googleapis.com")){
+   step++;
+   if(step===1)return Response.json({candidates:[{content:{role:"model",parts:[{functionCall:{
+    name:"compartilhar_produtos",args:{produto_ids:["dress-1","dress-2","dress-1"]}
+   }}]}}]});
+   return Response.json({candidates:[{content:{role:"model",parts:[{text:"Veja estas opções."}]}}]});
+  }
+  if(address.includes("/api/agent/v1/products?limit=30"))return Response.json({products:[{
+   id:"dress-1",name:"Vestido Aurora",slug:"vestido-aurora",categoryName:"Vestidos",image:"https://cdn.example.com/vestido.jpg",
+   productTypeSlug:"roupas",basePrice:649.9,currency:"BRL",inStock:true,
+  }]});
+  if(address.includes("/api/agent/v1/products/dress-1"))return Response.json({product:{
+   id:"dress-1",slug:"vestido-aurora",image:"https://cdn.example.com/vestido.jpg",status:"ACTIVE",
+  }});
+  if(address.includes("/api/agent/v1/products/dress-2"))return Response.json({product:{
+   id:"dress-2",slug:"vestido-azul",image:null,status:"DRAFT",
+  }});
+  throw Error("Unexpected network URL "+address);
+ };
+ try {
+  const store={id:"a",name:"Bonita de cheiro",store_url:"https://store-a.example.com",
+   commerce_api_key_enc:encrypt("internal-test-token"),whatsapp_phone_id:"12345678",
+   whatsapp_number:"5511999999999",whatsapp_token_enc:"",enabled:true,preferences:{}};
+  const reply=await respond(store,[{role:"user",text:"Me manda fotos dos vestidos"}]);
+  assert.equal(reply.text,"Veja estas opções.");
+  assert.deepEqual(reply.productLinks,["https://store-a.example.com/produtos/vestido-aurora"]);
+ } finally {globalThis.fetch=original;}
 });
