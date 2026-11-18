@@ -13,8 +13,8 @@ const schema = z.object({
  META_APP_SECRET: z.string().min(1),
  META_VERIFY_TOKEN: z.string().min(8),
  META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v23.0"),
- OPENAI_API_KEY: z.string().min(1),
- OPENAI_MODEL: z.string().min(1).default("gpt-4.1-mini"),
+ GEMINI_API_KEY: z.string().min(1),
+ GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
  ALLOWED_COMMERCE_HOSTS: z.string().default(""),
  PUBLIC_BASE_URL: z.string().url(),
 });
