@@ -97,6 +97,19 @@ function publicCommerceUrl(): string {
 async function remote<T>(path: string, method = "GET", payload?: object): Promise<T> {
   const cfg = remoteConfig();
   if (!cfg) throw new Error("Serviço de agentes ainda não configurado no servidor.");
+  if (process.env.AGENT_EMBEDDED === "true") {
+    // Run the agent API in-process. Managed Next.js hosts may not accept TCP
+    // connections to 127.0.0.1 even when the public application is healthy.
+    // Caller authentication remains enforced by the Next.js server actions.
+    const { executeEmbeddedAgentAdmin } = await import("../../../agent-service/src/server");
+    const result = await executeEmbeddedAgentAdmin(path, method, payload);
+    if (result.status === 401) throw new Error("Senha administrativa do serviço de agentes incorreta.");
+    if (result.status === 403) throw new Error("Serviço de agentes recusou a origem desta operação.");
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error("Serviço de agentes não concluiu a operação (" + result.status + ").");
+    }
+    return result.body as T;
+  }
   const response = await fetch(cfg.origin + cfg.apiPrefix + path, {
     method,
     redirect: "error",
