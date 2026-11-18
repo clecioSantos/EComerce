@@ -22,6 +22,11 @@ async function commerce(store: Store, method: "GET"|"POST", path: string, data?:
   return payload;
  } finally { clearTimeout(timeout); }
 }
+/** Mandatory catalog snapshot for each new customer reply. Never infer assortment from a shop name. */
+export async function listProducts(store: Store, limit = 30) {
+ const safeLimit = Math.max(1, Math.min(30, Math.trunc(limit)));
+ return commerce(store, "GET", "/api/agent/v1/products?limit=" + safeLimit);
+}
 export async function searchProducts(store: Store, term: string) {
  return commerce(store, "GET", "/api/agent/v1/products?q=" + encodeURIComponent(term.slice(0,120)) + "&limit=8");
 }
