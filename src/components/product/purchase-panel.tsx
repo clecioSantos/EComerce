@@ -80,10 +80,12 @@ export function PurchasePanel({ product }: { product: ProductDetailDTO }) {
 
   const available = selectedVariant?.inventory?.available ?? null;
   const allowsBackorder = selectedVariant?.inventory?.allowBackorder ?? false;
-  const canBuy = Boolean(selectedVariant) && (allowsBackorder || (available ?? 0) > 0);
+  const canBuy =
+    Boolean(selectedVariant?.isActive) && (allowsBackorder || (available ?? 0) > 0);
 
   function select(attributeId: string, valueId: string) {
     setSelection((current) => ({ ...current, [attributeId]: valueId }));
+    setQuantity(1);
   }
 
   function handleAdd() {
@@ -111,16 +113,21 @@ export function PurchasePanel({ product }: { product: ProductDetailDTO }) {
           value={selectedVariant?.price ?? product.basePrice}
           compareAt={selectedVariant?.compareAtPrice ?? product.compareAtPrice}
           currency={product.currency}
-          className="text-2xl"
+          className="text-3xl"
         />
-        {selectedVariant ? (
-          <p className="text-muted-foreground text-xs">SKU {selectedVariant.sku}</p>
-        ) : null}
       </div>
 
       {attributes.map((attribute) => (
-        <div key={attribute.id} className="space-y-2">
-          <p className="text-sm font-medium">{attribute.name}</p>
+        <fieldset key={attribute.id} className="space-y-3">
+          <legend className="text-sm font-medium">
+            {attribute.name}
+            <span className="text-muted-foreground ml-2 font-normal">
+              {
+                attribute.values.find((value) => value.id === selection[attribute.id])
+                  ?.value
+              }
+            </span>
+          </legend>
           <div className="flex flex-wrap gap-2">
             {attribute.values.map((value) => {
               const isSelected = selection[attribute.id] === value.id;
@@ -130,6 +137,8 @@ export function PurchasePanel({ product }: { product: ProductDetailDTO }) {
                   type="button"
                   variant={isSelected ? "default" : "outline"}
                   size="sm"
+                  className="min-h-11 min-w-11 rounded-none px-4"
+                  aria-pressed={isSelected}
                   onClick={() => select(attribute.id, value.id)}
                 >
                   {value.value}
@@ -137,16 +146,14 @@ export function PurchasePanel({ product }: { product: ProductDetailDTO }) {
               );
             })}
           </div>
-        </div>
+        </fieldset>
       ))}
 
       {selectedVariant ? (
         <p className="text-sm">
           {canBuy ? (
             available != null ? (
-              <span className="text-muted-foreground">
-                {available} em estoque
-              </span>
+              <span className="text-muted-foreground">Disponível</span>
             ) : null
           ) : (
             <Badge variant="secondary">Esgotado</Badge>
@@ -186,12 +193,15 @@ export function PurchasePanel({ product }: { product: ProductDetailDTO }) {
           size="lg"
           onClick={handleAdd}
           disabled={!canBuy || pending}
-          className="flex-1"
+          className="min-h-12 min-w-48 flex-1 rounded-none"
         >
           <ShoppingBag className="mr-2 size-4" />
           {pending ? "Adicionando..." : "Adicionar ao carrinho"}
         </Button>
       </div>
+      <p className="text-muted-foreground text-sm leading-relaxed">
+        As opções de entrega e os valores de frete são consultados no checkout.
+      </p>
     </div>
   );
 }

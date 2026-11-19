@@ -1,4 +1,4 @@
-import { CatalogFilters } from "@/components/catalog/catalog-filters";
+import { CatalogFilterPanel } from "@/components/catalog/catalog-filter-panel";
 import { PaginationControls } from "@/components/catalog/pagination-controls";
 import { ProductGrid } from "@/components/product/product-grid";
 import {
@@ -7,10 +7,7 @@ import {
   type CatalogFilters as CatalogFiltersInput,
 } from "@/modules/catalog/catalog.service";
 
-export type CatalogSearchParams = Record<
-  string,
-  string | string[] | undefined
->;
+export type CatalogSearchParams = Record<string, string | string[] | undefined>;
 
 function parseAttributeFilters(
   searchParams: CatalogSearchParams,
@@ -68,11 +65,13 @@ export async function CatalogView({
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8">
-      <div className="mb-6 space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+    <div className="mx-auto w-full max-w-7xl px-5 py-10 md:px-8 md:py-14">
+      <div className="mb-8 space-y-3">
+        <h1 className="font-serif text-4xl tracking-tight">{title}</h1>
         {description ? (
-          <p className="text-muted-foreground text-sm">{description}</p>
+          <p className="text-muted-foreground max-w-2xl text-base leading-relaxed">
+            {description}
+          </p>
         ) : null}
         <p className="text-muted-foreground text-xs">
           {result.total} produto(s) encontrado(s)
@@ -80,10 +79,8 @@ export async function CatalogView({
       </div>
 
       <div className="grid gap-8 md:grid-cols-[240px_1fr]">
-        <aside className="md:sticky md:top-24 md:self-start">
-          <CatalogFilters facets={facets} />
-        </aside>
-        <div>
+        <CatalogFilterPanel facets={facets} total={result.total} />
+        <div className="min-w-0">
           <ProductGrid products={result.items} />
           <PaginationControls page={result.page} totalPages={result.totalPages} />
         </div>

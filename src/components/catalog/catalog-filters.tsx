@@ -34,7 +34,9 @@ export function CatalogFilters({ facets }: { facets: CatalogFacets }) {
       mutate(params);
       params.delete("page");
       const query = params.toString();
-      router.push(query.length > 0 ? `${pathname}?${query}` : pathname);
+      router.push(query.length > 0 ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
     },
     [pathname, router, searchParams],
   );
@@ -55,8 +57,7 @@ export function CatalogFilters({ facets }: { facets: CatalogFacets }) {
   );
 
   const sort = searchParams.get("sort") ?? "relevance";
-  const hasFilters =
-    searchParams.toString().length > 0 && searchParams.get("page") !== "1";
+  const hasFilters = [...searchParams.keys()].some((key) => key.startsWith("attr_"));
 
   return (
     <div className="space-y-6">
@@ -66,7 +67,13 @@ export function CatalogFilters({ facets }: { facets: CatalogFacets }) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push(pathname)}
+            onClick={() =>
+              updateParams((params) => {
+                for (const key of [...params.keys()]) {
+                  if (key.startsWith("attr_")) params.delete(key);
+                }
+              })
+            }
           >
             Limpar
           </Button>
@@ -76,13 +83,14 @@ export function CatalogFilters({ facets }: { facets: CatalogFacets }) {
       <div className="space-y-2">
         <Label className="text-xs">Ordenar por</Label>
         <Select
+          items={SORT_OPTIONS}
           value={sort}
           onValueChange={(value) => {
             if (value == null) return;
             updateParams((params) => params.set("sort", value));
           }}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="min-h-11 w-full" aria-label="Ordenar por">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -99,8 +107,7 @@ export function CatalogFilters({ facets }: { facets: CatalogFacets }) {
 
       {facets.attributes.map((facet) => {
         const selected =
-          searchParams.get(`attr_${facet.slug}`)?.split(",").filter(Boolean) ??
-          [];
+          searchParams.get(`attr_${facet.slug}`)?.split(",").filter(Boolean) ?? [];
 
         return (
           <div key={facet.attributeId} className="space-y-3">
@@ -111,7 +118,7 @@ export function CatalogFilters({ facets }: { facets: CatalogFacets }) {
                 return (
                   <label
                     key={value.id}
-                    className="flex cursor-pointer items-center gap-2 text-sm"
+                    className="flex min-h-10 cursor-pointer items-center gap-3 text-sm"
                   >
                     <Checkbox
                       checked={checked}

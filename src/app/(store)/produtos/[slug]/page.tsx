@@ -66,7 +66,7 @@ export default async function ProductPage({
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-10">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -93,7 +93,7 @@ export default async function ProductPage({
         ) : null}
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid items-start gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
         <ProductGallery images={product.images} title={product.name} />
 
         <div className="space-y-5">
@@ -106,7 +106,14 @@ export default async function ProductPage({
                 </span>
               ) : null}
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">{product.name}</h1>
+            <h1 className="font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
+              {product.name}
+            </h1>
+            {product.shortDescription ? (
+              <p className="text-muted-foreground pt-2 text-base leading-relaxed">
+                {product.shortDescription}
+              </p>
+            ) : null}
             {rating.count > 0 ? (
               <p className="text-muted-foreground text-sm">
                 {rating.average.toFixed(1)} / 5 · {rating.count} avaliação(ões)
@@ -121,7 +128,7 @@ export default async function ProductPage({
           {product.description ? (
             <div className="space-y-2">
               <h2 className="text-sm font-semibold">Descrição</h2>
-              <p className="text-muted-foreground text-sm whitespace-pre-line">
+              <p className="text-muted-foreground text-base leading-relaxed whitespace-pre-line">
                 {product.description}
               </p>
             </div>
