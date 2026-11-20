@@ -91,6 +91,15 @@ describe("agent API tenant isolation",()=>{
   expect(res.status).toBe(409);
   expect(mocks.transaction).not.toHaveBeenCalled();
  });
+ it("does not sell returned units still awaiting inspection",async()=>{
+  mocks.auth.mockResolvedValue({storeId:"legacy-store"});
+  mocks.findVariants.mockResolvedValue([{
+   id:"variant-A",productId:"product-A",inventory:{allowBackorder:false,quantityOnHand:3,quantityReserved:0,quantityQuarantined:3},
+  }]);
+  const res=await createLink(post([{variantId:"variant-A",quantity:1}]));
+  expect(res.status).toBe(409);
+  expect(mocks.transaction).not.toHaveBeenCalled();
+ });
  it("creates checkout and session in one transaction for verified stock",async()=>{
   mocks.auth.mockResolvedValue({storeId:"legacy-store"});
   mocks.findVariants.mockResolvedValue([{

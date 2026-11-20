@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db/prisma";
 import { logEvent, logger } from "@/lib/logger";
 import { getRequestId } from "@/lib/request-context";
 import { restockStock } from "@/modules/inventory/inventory.service";
+import { closeIfResolved } from "@/modules/conditional/service";
 import { consumeOrderReservations } from "@/modules/orders/order.service";
 import { validateOrderTransition } from "@/modules/orders/order";
 
@@ -232,6 +233,17 @@ export async function refundPayment(params: {
   }
 
   const order = payment.order;
+  if (order.conditionalCaseId) {
+    if (params.amount != null && params.amount !== Number(payment.amount))
+      throw new Error("Reembolso parcial de condicional requer revisão do acerto.");
+    const items = await prisma.conditionalItem.findMany({
+      where: { caseId: order.conditionalCaseId },
+    });
+    if (items.some((item) => item.purchasedApprovedQuantity < item.soldQuantity))
+      throw new Error(
+        "Receba e confira as peças compradas no módulo Condicionais antes do reembolso.",
+      );
+  }
   const orderValidation = validateOrderTransition(order.status, "REFUNDED");
   if (!orderValidation.valid) throw new Error(orderValidation.error);
   assertPaymentTransition(payment.status, "REFUNDED");
@@ -261,7 +273,7 @@ export async function refundPayment(params: {
       },
     });
 
-    for (const item of order.items) {
+    for (const item of order.conditionalCaseId ? [] : order.items) {
       if (!item.variantId) {
         throw new Error(
           `Item ${item.sku} sem variante vinculada; não é possível restaurar estoque.`,
@@ -274,6 +286,8 @@ export async function refundPayment(params: {
       where: { id: order.id },
       data: { status: "REFUNDED", paymentStatus: "REFUNDED" },
     });
+    if (order.conditionalCaseId)
+      await closeIfResolved(tx, order.conditionalCaseId, { id: "refund", admin: true });
   });
 
   logEvent("PAYMENT_REFUNDED", {

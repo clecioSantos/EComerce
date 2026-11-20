@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
 import { expireOverdueReservations } from "@/modules/inventory/expiration.service";
+import { maintainConditionalCases } from "@/modules/conditional/service";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +19,9 @@ async function handle(request: NextRequest) {
 
   try {
     const result = await expireOverdueReservations();
+    const conditional = await maintainConditionalCases();
     logger.info({ event: "RESERVATIONS_EXPIRED", ...result });
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result, conditional });
   } catch (error) {
     logger.error({
       event: "RESERVATIONS_EXPIRATION_FAILED",

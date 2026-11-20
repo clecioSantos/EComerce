@@ -1,3 +1,4 @@
+import { ActionForm, Field } from "@/components/conditional/action-form";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -38,11 +39,17 @@ export default async function AccountPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
       <h1 className="text-2xl font-bold tracking-tight">Minha conta</h1>
+      <Link href="/conta/condicionais" className="mt-4 inline-block underline">
+        Meus condicionais e limites
+      </Link>
 
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <section className="space-y-2 rounded-lg border p-5">
           <h2 className="text-sm font-semibold">Dados pessoais</h2>
-          <p className="text-sm">{user.name}</p>
+          <ActionForm operation="contact" label="Atualizar dados">
+            <Field name="name" label="Nome completo" value={user.name ?? ""} required />
+            <Field name="phone" label="Telefone" value={user.phone ?? ""} required />
+          </ActionForm>
           <p className="text-muted-foreground text-sm">{user.email}</p>
           {user.phone ? <p className="text-sm">{user.phone}</p> : null}
           <Button

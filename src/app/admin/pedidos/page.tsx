@@ -51,7 +51,16 @@ export default async function AdminOrdersPage() {
                   {formatCurrency(Number(order.grandTotal), order.currency)}
                 </td>
                 <td className="px-4 py-3">
-                  <OrderStatusSelect orderId={order.id} status={order.status} />
+                  {order.conditionalCaseId ? (
+                    <Link
+                      className="underline"
+                      href={`/admin/condicionais/${order.conditionalCaseId}`}
+                    >
+                      Acerto de condicional
+                    </Link>
+                  ) : (
+                    <OrderStatusSelect orderId={order.id} status={order.status} />
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Button

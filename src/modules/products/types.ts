@@ -107,6 +107,7 @@ export interface ProductSummaryDTO {
 }
 
 export interface ProductDetailDTO extends ProductSummaryDTO {
+  conditionalEligible?: boolean;
   description: string | null;
   productType: { id: string; name: string; slug: string };
   category: { id: string; name: string; slug: string } | null;

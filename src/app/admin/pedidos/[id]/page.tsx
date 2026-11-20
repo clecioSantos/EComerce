@@ -77,7 +77,16 @@ export default async function AdminOrderDetailPage({
           <Badge variant="secondary">
             {PAYMENT_STATUS_LABELS[order.paymentStatus] ?? order.paymentStatus}
           </Badge>
-          <OrderStatusSelect orderId={order.id} status={order.status} />
+          {order.conditionalCaseId ? (
+            <Link
+              className="text-sm underline"
+              href={`/admin/condicionais/${order.conditionalCaseId}`}
+            >
+              Abrir condicional
+            </Link>
+          ) : (
+            <OrderStatusSelect orderId={order.id} status={order.status} />
+          )}
         </div>
       </div>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Minus, Plus, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -199,6 +201,14 @@ export function PurchasePanel({ product }: { product: ProductDetailDTO }) {
           {pending ? "Adicionando..." : "Adicionar ao carrinho"}
         </Button>
       </div>
+      {product.conditionalEligible && selectedVariant ? (
+        <Link
+          href={`/condicional/novo?variante=${selectedVariant.id}`}
+          className="block text-center text-sm underline underline-offset-4"
+        >
+          Solicitar para experimentar no condicional
+        </Link>
+      ) : null}
       <p className="text-muted-foreground text-sm leading-relaxed">
         As opções de entrega e os valores de frete são consultados no checkout.
       </p>

@@ -4,19 +4,29 @@ import { authenticateAgent, agentError } from "@/lib/agent-api/auth";
 import { prisma } from "@/lib/db/prisma";
 
 const requestSchema = z.object({
-  items: z.array(z.object({
-    variantId: z.string().min(1),
-    quantity: z.number().int().min(1).max(50),
-  })).min(1).max(30),
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().min(1),
+        quantity: z.number().int().min(1).max(50),
+      }),
+    )
+    .min(1)
+    .max(30),
 });
 
 export async function POST(request: Request) {
   try {
     const { storeId } = await authenticateAgent(request);
     // The browser checkout is still single-store. Fail closed until storefront tenant routing is complete.
-    if (storeId !== "legacy-store") return Response.json({ error: "Checkout multiloja ainda não habilitado com isolamento completo." }, { status: 409 });
+    if (storeId !== "legacy-store")
+      return Response.json(
+        { error: "Checkout multiloja ainda não habilitado com isolamento completo." },
+        { status: 409 },
+      );
     const parsed = requestSchema.safeParse(await request.json());
-    if (!parsed.success) return Response.json({ error: "Itens inválidos." }, { status: 400 });
+    if (!parsed.success)
+      return Response.json({ error: "Itens inválidos." }, { status: 400 });
 
     const combined = new Map<string, number>();
     for (const item of parsed.data.items) {
@@ -26,17 +36,34 @@ export async function POST(request: Request) {
       return Response.json({ error: "Quantidade excedida." }, { status: 400 });
     }
     const variants = await prisma.productVariant.findMany({
-      where: { id: { in: [...combined.keys()] }, isActive: true, product: { storeId, status: "ACTIVE" } },
+      where: {
+        id: { in: [...combined.keys()] },
+        isActive: true,
+        product: { storeId, status: "ACTIVE" },
+      },
       include: { product: true, inventory: true },
     });
     if (variants.length !== combined.size) {
-      return Response.json({ error: "Produto ou variante indisponível." }, { status: 400 });
+      return Response.json(
+        { error: "Produto ou variante indisponível." },
+        { status: 400 },
+      );
     }
     for (const variant of variants) {
       const inventory = variant.inventory;
       const quantity = combined.get(variant.id)!;
-      if (!inventory || (!inventory.allowBackorder && inventory.quantityOnHand - inventory.quantityReserved < quantity)) {
-        return Response.json({ error: "Estoque insuficiente.", variantId: variant.id }, { status: 409 });
+      if (
+        !inventory ||
+        (!inventory.allowBackorder &&
+          inventory.quantityOnHand -
+            inventory.quantityReserved -
+            (inventory.quantityQuarantined ?? 0) <
+            quantity)
+      ) {
+        return Response.json(
+          { error: "Estoque insuficiente.", variantId: variant.id },
+          { status: 409 },
+        );
       }
     }
 
@@ -52,11 +79,13 @@ export async function POST(request: Request) {
           storeId,
           status: "ACTIVE",
           sessionToken: cartToken,
-          items: { create: variants.map((variant) => ({
-            productId: variant.productId,
-            variantId: variant.id,
-            quantity: combined.get(variant.id)!,
-          })) },
+          items: {
+            create: variants.map((variant) => ({
+              productId: variant.productId,
+              variantId: variant.id,
+              quantity: combined.get(variant.id)!,
+            })),
+          },
         },
       });
       await tx.agentCheckoutSession.create({
@@ -64,8 +93,14 @@ export async function POST(request: Request) {
       });
     });
 
-    const url = new URL("/agent-checkout/" + token, process.env.NEXT_PUBLIC_SITE_URL || request.url);
-    return Response.json({ checkoutUrl: url.toString(), expiresAt: expiresAt.toISOString() }, { status: 201 });
+    const url = new URL(
+      "/agent-checkout/" + token,
+      process.env.NEXT_PUBLIC_SITE_URL || request.url,
+    );
+    return Response.json(
+      { checkoutUrl: url.toString(), expiresAt: expiresAt.toISOString() },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof SyntaxError) {
       return Response.json({ error: "JSON inválido." }, { status: 400 });

@@ -48,8 +48,10 @@ export async function listLowStock(threshold?: number) {
   });
   return items.filter((item) =>
     threshold == null
-      ? item.quantityOnHand - item.quantityReserved <= item.reorderLevel
-      : item.quantityOnHand - item.quantityReserved <= threshold,
+      ? item.quantityOnHand - item.quantityReserved - item.quantityQuarantined <=
+        item.reorderLevel
+      : item.quantityOnHand - item.quantityReserved - item.quantityQuarantined <=
+        threshold,
   );
 }
 
@@ -81,14 +83,14 @@ async function runGuardedUpdate(
         UPDATE "inventory"
         SET "quantityOnHand" = "quantityOnHand" - ${q}
         WHERE "variantId" = ${input.variantId}
-          AND ("allowBackorder" = true OR "quantityOnHand" >= ${q})`;
+          AND ("allowBackorder" = true OR "quantityOnHand" - "quantityQuarantined" >= ${q})`;
 
     case "ADJUSTMENT":
       return db.$executeRaw`
         UPDATE "inventory"
         SET "quantityOnHand" = "quantityOnHand" + ${input.quantity}
         WHERE "variantId" = ${input.variantId}
-          AND ("allowBackorder" = true OR "quantityOnHand" + ${input.quantity} >= 0)`;
+          AND ("allowBackorder" = true OR "quantityOnHand" + ${input.quantity} >= "quantityReserved" + "quantityQuarantined")`;
 
     case "RESERVATION":
       return db.$executeRaw`
@@ -96,7 +98,7 @@ async function runGuardedUpdate(
         SET "quantityReserved" = "quantityReserved" + ${q}
         WHERE "variantId" = ${input.variantId}
           AND ("allowBackorder" = true
-               OR ("quantityOnHand" - "quantityReserved") >= ${q})`;
+               OR ("quantityOnHand" - "quantityReserved" - "quantityQuarantined") >= ${q})`;
 
     case "RELEASE":
       return db.$executeRaw`
@@ -112,7 +114,7 @@ async function runGuardedUpdate(
             "quantityReserved" = "quantityReserved" - ${q}
         WHERE "variantId" = ${input.variantId}
           AND "quantityReserved" >= ${q}
-          AND ("allowBackorder" = true OR "quantityOnHand" >= ${q})`;
+          AND ("allowBackorder" = true OR "quantityOnHand" - "quantityQuarantined" >= ${q})`;
 
     default: {
       const exhaustive: never = input.type as never;
@@ -142,9 +144,7 @@ export async function applyInventoryMovement(
           `Inventário não encontrado para a variante ${input.variantId}.`,
         );
       }
-      throw new InventoryError(
-        "Estoque insuficiente ou conflito de concorrência.",
-      );
+      throw new InventoryError("Estoque insuficiente ou conflito de concorrência.");
     }
 
     const inventory = await db.inventory.findUniqueOrThrow({
@@ -170,11 +170,7 @@ export async function applyInventoryMovement(
   return prisma.$transaction((transaction) => run(transaction));
 }
 
-export async function adjustStock(
-  variantId: string,
-  quantity: number,
-  reason?: string,
-) {
+export async function adjustStock(variantId: string, quantity: number, reason?: string) {
   return applyInventoryMovement({ variantId, type: "ADJUSTMENT", quantity, reason });
 }
 

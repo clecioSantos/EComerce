@@ -32,6 +32,7 @@ const NAV_ITEMS = [
   { href: "/admin/atributos", label: "Atributos", icon: Tags },
   { href: "/admin/estoque", label: "Estoque", icon: Warehouse },
   { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingCart },
+  { href: "/admin/condicionais", label: "Condicionais", icon: Boxes },
   { href: "/admin/pagamentos", label: "Pagamentos", icon: CreditCard },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/cupons", label: "Cupons", icon: Ticket },

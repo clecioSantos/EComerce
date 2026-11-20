@@ -28,9 +28,7 @@ export default async function AdminDashboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">
-          Visão geral da operação.
-        </p>
+        <p className="text-muted-foreground text-sm">Visão geral da operação.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -61,7 +59,8 @@ export default async function AdminDashboardPage() {
                   <span className="text-muted-foreground"> · {item.variant.sku}</span>
                 </span>
                 <span className="text-muted-foreground">
-                  {item.quantityOnHand - item.quantityReserved} disponível
+                  {item.quantityOnHand - item.quantityReserved - item.quantityQuarantined}{" "}
+                  disponível
                 </span>
               </li>
             ))}

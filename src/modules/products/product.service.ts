@@ -73,6 +73,7 @@ function hasStock(
     inventory: {
       quantityOnHand: number;
       quantityReserved: number;
+      quantityQuarantined?: number;
       allowBackorder: boolean;
     } | null;
   }[],
@@ -80,7 +81,12 @@ function hasStock(
   return variants.some((variant) => {
     if (!variant.inventory) return false;
     if (variant.inventory.allowBackorder) return true;
-    return variant.inventory.quantityOnHand - variant.inventory.quantityReserved > 0;
+    return (
+      variant.inventory.quantityOnHand -
+        variant.inventory.quantityReserved -
+        (variant.inventory.quantityQuarantined ?? 0) >
+      0
+    );
   });
 }
 
@@ -148,7 +154,9 @@ export function mapProductDetail(product: ProductWithDetail): ProductDetailDTO {
             quantityOnHand: variant.inventory.quantityOnHand,
             quantityReserved: variant.inventory.quantityReserved,
             available:
-              variant.inventory.quantityOnHand - variant.inventory.quantityReserved,
+              variant.inventory.quantityOnHand -
+              variant.inventory.quantityReserved -
+              (variant.inventory.quantityQuarantined ?? 0),
             reorderLevel: variant.inventory.reorderLevel,
             allowBackorder: variant.inventory.allowBackorder,
           }
@@ -173,6 +181,7 @@ export function mapProductDetail(product: ProductWithDetail): ProductDetailDTO {
     slug: product.slug,
     shortDescription: product.shortDescription,
     description: product.description,
+    conditionalEligible: product.conditionalEligible,
     status: product.status,
     basePrice: toNumber(product.basePrice),
     compareAtPrice:

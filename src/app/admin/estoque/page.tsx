@@ -33,13 +33,16 @@ export default async function AdminInventoryPage() {
               <th className="px-4 py-3 font-medium">Físico</th>
               <th className="px-4 py-3 font-medium">Reservado</th>
               <th className="px-4 py-3 font-medium">Disponível</th>
+              <th className="px-4 py-3 font-medium">Em condicional</th>
+              <th className="px-4 py-3 font-medium">Em conferência</th>
               <th className="px-4 py-3 font-medium">Envio</th>
               <th className="px-4 py-3 font-medium">Ajustar</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {items.map((item) => {
-              const available = item.quantityOnHand - item.quantityReserved;
+              const available =
+                item.quantityOnHand - item.quantityReserved - item.quantityQuarantined;
               return (
                 <tr key={item.id}>
                   <td className="px-4 py-3">{item.variant.product.name}</td>
@@ -53,6 +56,8 @@ export default async function AdminInventoryPage() {
                       <span>{available}</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">{item.quantityOnConditional}</td>
+                  <td className="px-4 py-3">{item.quantityQuarantined}</td>
                   <td className="px-4 py-3">
                     <VariantLogisticsForm
                       variantId={item.variantId}

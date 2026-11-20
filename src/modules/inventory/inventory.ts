@@ -4,15 +4,10 @@
  */
 
 export type MovementType =
-  | "IN"
-  | "OUT"
-  | "ADJUSTMENT"
-  | "RESERVATION"
-  | "RELEASE"
-  | "CONSUME"
-  | "RESTOCK";
+  "IN" | "OUT" | "ADJUSTMENT" | "RESERVATION" | "RELEASE" | "CONSUME" | "RESTOCK";
 
 export interface InventoryState {
+  quantityQuarantined?: number;
   quantityOnHand: number;
   quantityReserved: number;
   allowBackorder?: boolean;
@@ -42,7 +37,7 @@ export class InventoryError extends Error {
 }
 
 export function availableQuantity(state: InventoryState): number {
-  return state.quantityOnHand - state.quantityReserved;
+  return state.quantityOnHand - state.quantityReserved - (state.quantityQuarantined ?? 0);
 }
 
 export function canFulfill(state: InventoryState, quantity: number): boolean {
@@ -103,7 +98,10 @@ export function applyMovement(
       "Estoque insuficiente: a quantidade disponível não pode ficar negativa.",
     );
   }
-  if (!allowBackorder && quantityReserved > quantityOnHand) {
+  if (
+    !allowBackorder &&
+    quantityReserved + (state.quantityQuarantined ?? 0) > quantityOnHand
+  ) {
     throw new InventoryError(
       "Não é possível reservar mais do que a quantidade física em estoque.",
     );

@@ -24,9 +24,47 @@ export async function getCustomerByEmail(email: string) {
   return prisma.user.findUnique({ where: { email: email.toLowerCase() } });
 }
 
-export async function listCustomers() {
+export async function listCustomers(
+  filters: { query?: string; eligibility?: string } = {},
+) {
+  const query = filters.query?.trim().slice(0, 120);
+  const eligibility = filters.eligibility;
   return prisma.user.findMany({
-    where: { role: "CUSTOMER" },
+    where: {
+      role: "CUSTOMER",
+      AND: [
+        ...(query
+          ? [
+              {
+                OR: [
+                  { name: { contains: query, mode: "insensitive" as const } },
+                  { email: { contains: query, mode: "insensitive" as const } },
+                ],
+              },
+            ]
+          : []),
+        ...(eligibility === "NOT_REVIEWED"
+          ? [
+              {
+                OR: [
+                  { conditionalProfiles: { none: { storeId: "legacy-store" } } },
+                  {
+                    conditionalProfiles: {
+                      some: { storeId: "legacy-store", eligibility },
+                    },
+                  },
+                ],
+              },
+            ]
+          : eligibility && ["ELIGIBLE", "SUSPENDED", "INELIGIBLE"].includes(eligibility)
+            ? [
+                {
+                  conditionalProfiles: { some: { storeId: "legacy-store", eligibility } },
+                },
+              ]
+            : []),
+      ],
+    },
     select: {
       id: true,
       name: true,
@@ -34,6 +72,10 @@ export async function listCustomers() {
       phone: true,
       createdAt: true,
       _count: { select: { orders: true } },
+      conditionalProfiles: {
+        where: { storeId: "legacy-store" },
+        select: { eligibility: true, maxOpenAmount: true, maxOpenUnits: true },
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 100,

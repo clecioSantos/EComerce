@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db/prisma";
+import { settleConditionalOrder } from "@/modules/conditional/settlement";
 import { isUniqueConstraintError } from "@/lib/db/errors";
 import { logEvent } from "@/lib/logger";
 import { getRequestId } from "@/lib/request-context";
@@ -210,6 +211,10 @@ export async function consumeOrderReservations(
   const order = await tx.order.findUnique({ where: { id: orderId } });
   if (!order) throw new Error("Pedido não encontrado.");
   if (order.status === "PAID") return; // idempotente
+  if (order.conditionalCaseId) {
+    await settleConditionalOrder(tx, orderId, order.conditionalCaseId);
+    return;
+  }
 
   assertOrderTransition(order.status, "PAID");
 
@@ -260,6 +265,10 @@ export async function cancelOrder(orderId: string) {
     });
     if (!order) throw new Error("Pedido não encontrado.");
     if (order.status === "CANCELED") return order; // idempotente
+    if (order.conditionalCaseId)
+      throw new Error(
+        "Acerto de condicional não pode ser cancelado como pedido comum. Resolva as peças no módulo Condicionais.",
+      );
 
     assertOrderTransition(order.status, "CANCELED");
 
@@ -305,6 +314,10 @@ export async function cancelOrder(orderId: string) {
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) throw new Error("Pedido não encontrado.");
+  if (order.conditionalCaseId)
+    throw new Error(
+      "Atualize este acerto pelo módulo Condicionais; o pagamento é confirmado pelo provedor.",
+    );
   if (status === "CANCELED") return cancelOrder(orderId);
   if (status === "PAID") return confirmOrderPayment(orderId);
   if (status === "REFUNDED") {
