@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Shared hosting exposes more CPUs than its process/thread quota permits.
+  // Bound page-data and static-generation workers instead of using that CPU count.
+  experimental: {
+    cpus: 2,
+  },
   // Keep OG tags in the initial head for every WhatsApp/Meta crawler variant.
   htmlLimitedBots: /.*/,
   images: {
