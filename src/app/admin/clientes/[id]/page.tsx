@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ArrowLeft, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db/prisma";
@@ -31,10 +33,17 @@ export default async function CustomerDetailPage({
   const p = summary.profile;
   return (
     <div className="mx-auto max-w-4xl space-y-7">
-      <h1 className="text-3xl font-semibold">Cadastro da cliente</h1>
-      <Link href="/admin/clientes" className="underline">
-        Voltar aos clientes
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-semibold">Editar cliente</h1>
+        <Button
+          variant="outline"
+          className="min-h-11 px-4"
+          render={<Link href="/admin/clientes" />}
+        >
+          <ArrowLeft aria-hidden="true" />
+          Voltar aos clientes
+        </Button>
+      </div>
       <section className="bg-background space-y-3 rounded border p-5">
         <h2 className="text-xl font-semibold">Identificação e contato</h2>
         <ActionForm
@@ -54,9 +63,13 @@ export default async function CustomerDetailPage({
         ))}
       </section>
       <CustomerCapacity summary={summary} admin />
-      <Link href={`/condicional/novo?cliente=${id}`} className="inline-block underline">
+      <Button
+        className="min-h-11 px-4"
+        render={<Link href={`/condicional/novo?cliente=${id}`} />}
+      >
+        <Plus aria-hidden="true" />
         Criar solicitação para esta cliente
-      </Link>
+      </Button>
       <section className="bg-background space-y-4 rounded border p-5">
         <h2 className="text-xl font-semibold">Elegibilidade e limites individuais</h2>
         <p className="text-muted-foreground text-sm">

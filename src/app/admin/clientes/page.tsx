@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatDate, formatCurrency } from "@/lib/format";
 import { ELIGIBILITY_LABELS } from "@/modules/conditional/rules";
 import { listCustomers } from "@/modules/customers/customer.service";
@@ -23,6 +25,9 @@ export default async function AdminCustomersPage({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
         <p className="text-muted-foreground text-sm">{customers.length} cliente(s).</p>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Use Editar para atualizar o cadastro, a elegibilidade e os limites do cliente.
+        </p>
       </div>
 
       <form className="flex flex-wrap items-end gap-4 text-sm" method="get">
@@ -62,6 +67,7 @@ export default async function AdminCustomersPage({
           <thead className="bg-muted/50 text-left">
             <tr>
               <th className="px-4 py-3 font-medium">Nome</th>
+              <th className="px-4 py-3 font-medium">Ações</th>
               <th className="px-4 py-3 font-medium">E-mail</th>
               <th className="px-4 py-3 font-medium">Pedidos</th>
               <th className="px-4 py-3 font-medium">Cadastro</th>
@@ -72,10 +78,17 @@ export default async function AdminCustomersPage({
           <tbody className="divide-y">
             {customers.map((customer) => (
               <tr key={customer.id}>
+                <td className="px-4 py-3">{customer.name ?? "Sem nome"}</td>
                 <td className="px-4 py-3">
-                  <Link className="underline" href={`/admin/clientes/${customer.id}`}>
-                    {customer.name ?? "Abrir cadastro"}
-                  </Link>
+                  <Button
+                    variant="outline"
+                    className="min-h-11 px-4"
+                    aria-label={`Editar cliente ${customer.name ?? customer.email}`}
+                    render={<Link href={`/admin/clientes/${customer.id}`} />}
+                  >
+                    <Pencil aria-hidden="true" />
+                    Editar
+                  </Button>
                 </td>
                 <td className="text-muted-foreground px-4 py-3">{customer.email}</td>
                 <td className="px-4 py-3">{customer._count.orders}</td>
@@ -98,7 +111,7 @@ export default async function AdminCustomersPage({
             ))}
             {customers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-muted-foreground px-4 py-8 text-center">
+                <td colSpan={7} className="text-muted-foreground px-4 py-8 text-center">
                   Nenhum cliente.
                 </td>
               </tr>

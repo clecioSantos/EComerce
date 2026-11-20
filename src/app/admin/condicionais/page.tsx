@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Settings, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db/prisma";
 import { listCases } from "@/modules/conditional/service";
@@ -21,13 +23,19 @@ export default async function ConditionalAdminPage({
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-semibold">Condicionais</h1>
-      <div className="flex flex-wrap gap-5 text-sm">
-        <Link href="/admin/condicionais/configuracoes" className="underline">
-          Políticas e produtos
-        </Link>
-        <Link href="/admin/clientes" className="underline">
+      <div className="flex flex-wrap gap-3">
+        <Button className="min-h-11 px-4" render={<Link href="/admin/clientes" />}>
+          <Users aria-hidden="true" />
           Clientes e limites
-        </Link>
+        </Button>
+        <Button
+          variant="outline"
+          className="min-h-11 px-4"
+          render={<Link href="/admin/condicionais/configuracoes" />}
+        >
+          <Settings aria-hidden="true" />
+          Políticas e produtos
+        </Button>
       </div>
       <p className="text-sm">
         Novas solicitações:{" "}
