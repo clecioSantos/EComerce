@@ -79,16 +79,6 @@ export function AdminSidebar() {
       <aside className="bg-background hidden w-64 shrink-0 border-r md:block">
         <div className="flex h-16 items-center border-b px-5 font-semibold">Painel</div>
         <NavList />
-        <div className="p-3">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            render={<Link href="/" />}
-          >
-            Ver loja
-          </Button>
-        </div>
       </aside>
 
       <div className="bg-background flex h-16 items-center justify-between border-b px-4 md:hidden">
