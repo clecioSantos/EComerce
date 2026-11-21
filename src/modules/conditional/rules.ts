@@ -30,9 +30,7 @@ export const settingsSchema = z
   .object({
     ...limitsShape,
     enabled: z.boolean(),
-    trialDays: z.coerce.number().int().min(1).max(30),
-    returnDays: z.coerce.number().int().min(1).max(60),
-    paymentDays: z.coerce.number().int().min(1).max(30),
+    totalDays: z.coerce.number().int().min(1).max(60),
     reserveHours: z.coerce.number().int().min(1).max(168),
     requestHours: z.coerce.number().int().min(1).max(168),
     terms: z.string().trim().max(10000),

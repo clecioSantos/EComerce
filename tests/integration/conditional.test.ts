@@ -49,9 +49,7 @@ beforeAll(async () => {
   await c.saveSettings(admin, {
     ...limits,
     enabled: true,
-    trialDays: 3,
-    returnDays: 5,
-    paymentDays: 3,
+    totalDays: 3,
     reserveHours: 24,
     requestHours: 48,
     terms: "Condições fictícias exclusivas para testes automatizados.",
@@ -134,6 +132,70 @@ async function deliver(f: Awaited<ReturnType<typeof fixtureCase>>) {
   return id;
 }
 describe("condicional transacional", () => {
+  it("mantém um prazo total desde o recebimento, sem dias extras na escolha", async () => {
+    const f = await fixtureCase(2);
+    const id = await deliver(f);
+    let row = await c.getCase(f.actor, id);
+    expect((row.policy as { totalDays: number }).totalDays).toBe(3);
+    expect(row.choiceDueAt!.getTime() - row.receivedAt!.getTime()).toBeCloseTo(
+      3 * 86400000,
+      -2,
+    );
+    // Simulate a choice near the end of the original period.
+    const deadline = new Date(Date.now() + 3600000);
+    await prisma.conditionalCase.update({
+      where: { id },
+      data: { choiceDueAt: deadline },
+    });
+    await c.chooseConditional(f.actor, id, [{ itemId: row.items[0].id, quantity: 1 }]);
+    row = await c.getCase(f.actor, id);
+    expect(row.paymentDueAt).toEqual(deadline);
+    expect(row.returnDueAt).toEqual(deadline);
+    const extended = new Date(Date.now() + 5 * 86400000);
+    await c.reviewCase(admin, id, {
+      totalDueAt: extended,
+      reason: "Prorrogação única autorizada",
+    });
+    row = await c.getCase(f.actor, id);
+    expect([row.choiceDueAt, row.paymentDueAt, row.returnDueAt]).toEqual([
+      extended,
+      extended,
+      extended,
+    ]);
+    await expect(
+      c.reviewCase(admin, id, {
+        paymentDueAt: extended,
+        reason: "Prazo separado inválido",
+      }),
+    ).rejects.toThrow("apenas o prazo total");
+  });
+  it("preserva as três etapas das políticas aceitas anteriormente", async () => {
+    const f = await fixtureCase(2);
+    const id = await f.request();
+    const original = await c.getCase(f.actor, id);
+    const policy: Record<string, number> = {
+      ...(original.policy as Record<string, number>),
+      trialDays: 3,
+      returnDays: 5,
+      paymentDays: 2,
+    };
+    delete policy.totalDays;
+    await prisma.conditionalCase.update({ where: { id }, data: { policy } });
+    await c.approveConditional(admin, id);
+    await c.dispatchConditional(admin, id, "", "Saída de teste conferida");
+    await c.receiveConditional(admin, id, "Recebimento de teste confirmado");
+    const row = await c.getCase(f.actor, id);
+    await c.chooseConditional(f.actor, id, [{ itemId: row.items[0].id, quantity: 1 }]);
+    const decided = await c.getCase(f.actor, id);
+    expect(decided.paymentDueAt!.getTime() - decided.decidedAt!.getTime()).toBeCloseTo(
+      2 * 86400000,
+      -2,
+    );
+    expect(decided.returnDueAt!.getTime() - decided.decidedAt!.getTime()).toBeCloseTo(
+      5 * 86400000,
+      -2,
+    );
+  });
   it("compra parcial, pagamento e retorno conferido conservam estoque e limites", async () => {
     const f = await fixtureCase();
     const id = await deliver(f);

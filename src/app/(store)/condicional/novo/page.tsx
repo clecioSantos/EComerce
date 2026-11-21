@@ -69,6 +69,11 @@ export default async function NewConditionalPage({
       ) : null}
       {canRequest && policy ? (
         <>
+          <p className="bg-muted/40 rounded-lg border p-4 text-sm">
+            Prazo total do condicional: <strong>{policy.trialDays} dias</strong> a partir
+            do recebimento das peças para experimentar, escolher, pagar o acerto e
+            devolver o restante. A escolha não inicia um novo prazo.
+          </p>
           {!addresses.length ? (
             <p>
               Cadastre nome, telefone e endereço em{" "}

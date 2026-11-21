@@ -74,6 +74,7 @@ export function Field({
   type = "text",
   required = false,
   min,
+  max,
   step,
 }: {
   name: string;
@@ -82,6 +83,7 @@ export function Field({
   type?: string;
   required?: boolean;
   min?: number;
+  max?: number;
   step?: string;
 }) {
   return (
@@ -94,6 +96,7 @@ export function Field({
         defaultValue={value}
         required={required}
         min={min}
+        max={max}
         step={step}
       />
     </label>

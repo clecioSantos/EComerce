@@ -138,7 +138,14 @@ export async function saveSettings(actor: Actor, input: unknown) {
     const before = await tx.conditionalSettings.findUnique({
       where: { storeId: STORE_ID },
     });
-    const { reason, ...values } = data;
+    const { reason, totalDays, ...rest } = data;
+    // Keep the existing columns for compatibility with previously accepted policies.
+    const values = {
+      ...rest,
+      trialDays: totalDays,
+      returnDays: totalDays,
+      paymentDays: totalDays,
+    };
     const after = await tx.conditionalSettings.upsert({
       where: { storeId: STORE_ID },
       create: { ...values, storeId: STORE_ID },
@@ -345,7 +352,7 @@ export async function requestConditional(actor: Actor, input: unknown) {
         terms: current.terms,
         termsVersion: current.termsVersion,
         freightPolicy: current.freightPolicy,
-        policy: json(current),
+        policy: json({ ...current, totalDays: current.trialDays }),
         acceptedAt: new Date(),
         requestDueAt: afterHours(current.requestHours),
         shippingFee: current.customerPaysShipping ? shipping.price : 0,
@@ -527,7 +534,7 @@ export async function receiveConditional(actor: Actor, id: string, evidence: str
       data: {
         status: "RECEIVED",
         receivedAt: new Date(),
-        choiceDueAt: afterHours(policy.trialDays * 24),
+        choiceDueAt: afterHours((policy.totalDays ?? policy.trialDays) * 24),
       },
     });
     await event(
@@ -535,7 +542,9 @@ export async function receiveConditional(actor: Actor, id: string, evidence: str
       id,
       actor,
       "RECEIVED",
-      "Recebimento confirmado. Prazo de experimentação iniciado.",
+      policy.totalDays
+        ? "Recebimento confirmado. Prazo total do condicional iniciado."
+        : "Recebimento confirmado. Prazo de experimentação iniciado.",
     );
   });
 }
@@ -612,8 +621,17 @@ export async function chooseConditional(actor: Actor, id: string, input: unknown
       data: {
         status: "DECIDED",
         decidedAt: new Date(),
-        paymentDueAt: total > 0 ? afterHours(policy.paymentDays * 24) : null,
-        returnDueAt: hasReturn ? afterHours(policy.returnDays * 24) : null,
+        paymentDueAt:
+          total > 0
+            ? policy.totalDays
+              ? row.choiceDueAt
+              : afterHours(policy.paymentDays * 24)
+            : null,
+        returnDueAt: hasReturn
+          ? policy.totalDays
+            ? row.choiceDueAt
+            : afterHours(policy.returnDays * 24)
+          : null,
       },
     });
     await event(
@@ -797,6 +815,7 @@ export async function reviewCase(
     choiceDueAt?: Date;
     returnDueAt?: Date;
     paymentDueAt?: Date;
+    totalDueAt?: Date;
   },
 ) {
   admin(actor);
@@ -810,14 +829,31 @@ export async function reviewCase(
       returnDueAt: row.returnDueAt,
       paymentDueAt: row.paymentDueAt,
     };
-    for (const field of ["choiceDueAt", "returnDueAt", "paymentDueAt"] as const) {
+    for (const field of [
+      "choiceDueAt",
+      "returnDueAt",
+      "paymentDueAt",
+      "totalDueAt",
+    ] as const) {
       if (
         input[field] &&
         (!Number.isFinite(input[field]!.getTime()) || input[field]! < new Date())
       )
         throw new Error("Informe uma data futura.");
     }
-    const { reason, ...data } = input;
+    const { reason, totalDueAt, ...data } = input;
+    if ((row.policy as Record<string, unknown>).totalDays) {
+      if (input.choiceDueAt || input.returnDueAt || input.paymentDueAt)
+        throw new Error("Informe apenas o prazo total do condicional.");
+      if (totalDueAt) {
+        assertStatus(row, ["RECEIVED", "DECIDED"]);
+        data.choiceDueAt = totalDueAt;
+        if (row.returnDueAt) data.returnDueAt = totalDueAt;
+        if (row.paymentDueAt) data.paymentDueAt = totalDueAt;
+      }
+    } else if (totalDueAt) {
+      throw new Error("Esta operação utiliza os prazos aceitos anteriormente.");
+    }
     await tx.conditionalCase.update({ where: { id }, data });
     await event(tx, id, actor, "REVIEW", reason, undefined, { before, after: data });
     await closeIfResolved(tx, id, actor);

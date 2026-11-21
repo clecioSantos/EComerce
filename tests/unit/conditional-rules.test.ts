@@ -76,9 +76,7 @@ describe("limites de condicional", () => {
       settingsSchema.safeParse({
         ...caps,
         enabled: true,
-        trialDays: 3,
-        returnDays: 5,
-        paymentDays: 3,
+        totalDays: 3,
         reserveHours: 24,
         requestHours: 48,
         terms: "",

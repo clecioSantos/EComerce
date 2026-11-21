@@ -52,10 +52,17 @@ export default async function ConditionalSettingsPage() {
           }
         />
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            name="totalDays"
+            label="Prazo total do condicional (dias)"
+            type="number"
+            min={1}
+            max={60}
+            step="1"
+            value={settings?.trialDays ?? 3}
+            required
+          />
           {[
-            ["trialDays", "Dias para experimentar", 3],
-            ["returnDays", "Dias para devolver", 5],
-            ["paymentDays", "Dias para pagar o acerto", 3],
             ["reserveHours", "Horas para expedir após aprovação", 24],
             ["requestHours", "Horas de validade da solicitação", 48],
           ].map(([name, label, defaultValue]) => (
@@ -66,11 +73,18 @@ export default async function ConditionalSettingsPage() {
               type="number"
               min={1}
               step="1"
-              value={Number(settings?.[name as "trialDays"] ?? defaultValue)}
+              value={Number(
+                settings?.[name as "reserveHours" | "requestHours"] ?? defaultValue,
+              )}
               required
             />
           ))}
         </div>
+        <p className="text-muted-foreground text-sm">
+          Contado a partir do recebimento das peças. Dentro desse prazo, a cliente deve
+          escolher o que vai comprar, pagar o acerto e devolver as demais peças. A escolha
+          não inicia um novo prazo. Operações já solicitadas mantêm os prazos aceitos.
+        </p>
         <label className="grid gap-2 text-sm">
           Condições de uso
           <textarea

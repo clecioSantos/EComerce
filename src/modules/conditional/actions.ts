@@ -170,6 +170,9 @@ export async function conditionalAction(input: unknown) {
       case "review":
         await conditional.reviewCase(actor, id(caseId), {
           reason: text(v.reason),
+          ...(v.totalDueAt
+            ? { totalDueAt: new Date(`${v.totalDueAt}T23:59:59-03:00`) }
+            : {}),
           ...(v.issueMode === "clear"
             ? { issue: null }
             : v.issue

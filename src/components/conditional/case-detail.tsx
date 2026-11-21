@@ -10,6 +10,7 @@ import { formatCurrency, formatDateTime } from "@/lib/format";
 const box = "space-y-4 rounded-lg border bg-background p-5";
 export async function CaseDetail({ row, actor }: { row: CaseRow; actor: Actor }) {
   const isAdmin = actor.admin;
+  const totalDays = Number((row.policy as Record<string, unknown>).totalDays ?? 0);
   const values = { caseId: row.id };
   const showReturns = ["DECIDED", "CLOSED"].includes(row.status);
   const address = row.address as {
@@ -110,9 +111,13 @@ export async function CaseDetail({ row, actor }: { row: CaseRow; actor: Actor })
           {[
             ["Solicitação", row.requestDueAt],
             ["Separação", row.reserveDueAt],
-            ["Escolha", row.choiceDueAt],
-            ["Retorno", row.returnDueAt],
-            ["Pagamento", row.paymentDueAt],
+            ...(totalDays
+              ? [["Prazo total do condicional", row.choiceDueAt]]
+              : [
+                  ["Escolha", row.choiceDueAt],
+                  ["Retorno", row.returnDueAt],
+                  ["Pagamento", row.paymentDueAt],
+                ]),
           ].map(([label, date]) =>
             date ? (
               <div key={String(label)}>
@@ -122,6 +127,12 @@ export async function CaseDetail({ row, actor }: { row: CaseRow; actor: Actor })
             ) : null,
           )}
         </dl>
+        {totalDays ? (
+          <p className="text-sm">
+            Prazo total: {totalDays} dias a partir do recebimento para escolher as peças,
+            pagar o acerto e devolver o restante. A escolha não reinicia a contagem.
+          </p>
+        ) : null}
         <p className="text-sm whitespace-pre-line">{row.freightPolicy}</p>
         <p className="text-sm">
           Frete de ida no acerto: {formatCurrency(Number(row.shippingFee))}. Taxa de
@@ -406,10 +417,17 @@ export async function CaseDetail({ row, actor }: { row: CaseRow; actor: Actor })
               <input name="issueMode" type="checkbox" value="clear" />
               Resolver ocorrência atual
             </label>
-            {row.status === "RECEIVED" ? (
+            {totalDays && ["RECEIVED", "DECIDED"].includes(row.status) ? (
+              <Field
+                name="totalDueAt"
+                label="Novo prazo total do condicional"
+                type="date"
+              />
+            ) : null}
+            {!totalDays && row.status === "RECEIVED" ? (
               <Field name="choiceDueAt" label="Novo prazo de escolha" type="date" />
             ) : null}
-            {row.status === "DECIDED" ? (
+            {!totalDays && row.status === "DECIDED" ? (
               <>
                 <Field name="returnDueAt" label="Novo prazo de retorno" type="date" />
                 <Field name="paymentDueAt" label="Novo prazo de pagamento" type="date" />

@@ -15,7 +15,7 @@ O recurso começa desativado. Clientes começam sem avaliação e sem limites. P
 2. Ela revisa condições, fretes e taxa de retorno informada, aceita a versão e envia a solicitação. O administrador também pode registrar uma solicitação para uma cliente autorizada, com o aceite dela.
 3. Administrador aprova: disponibilidade e limites são verificados novamente, e a reserva é feita na mesma transação. O valor total em aberto respeita os tetos da loja e os individuais.
 4. Administrador registra saída e evidência de retirada/postagem. Peças passam ao saldo **Em condicional** e deixam o físico da loja.
-5. Administrador confirma recebimento pela cliente com evidência. Começa o prazo de experimentação.
+5. Administrador confirma recebimento pela cliente com evidência. Começa o prazo total do condicional.
 6. Cliente informa quantas unidades quer comprar de cada variante. A escolha fica fixada, gera o acerto e não altera as quantidades em estoque por si só.
 7. Cliente inicia o pagamento por **PIX**. Webhooks e reconciliação do provedor confirmam o pagamento; não existe cobrança automática por prazo vencido ou cartão salvo.
 8. Cliente informa o retorno; a loja registra as quantidades efetivamente recebidas. Elas entram em **Em conferência**, sem ficarem disponíveis para venda.
@@ -26,7 +26,9 @@ Pagamento e devolução são independentes. Pagamento aprovado não significa qu
 
 ## Prazos e ocorrências
 
-As telas mostram os prazos vencidos e bloqueiam novas aprovações para clientes com pendências. O administrador pode registrar/resolver ocorrências e prorrogar escolha, retorno e pagamento com motivo e histórico.
+Configure um único **Prazo total do condicional (dias)**, de 1 a 60 dias, contado do recebimento confirmado. Dentro desse período a cliente experimenta, escolhe, paga o acerto e devolve as demais peças. A escolha não reinicia a contagem nem acrescenta dias. Por exemplo, em um condicional de 7 dias, escolher no sexto dia deixa apenas o restante do prazo para pagar e devolver.
+
+As telas mostram o vencimento único e bloqueiam novas aprovações para clientes com pendências. O administrador pode registrar/resolver ocorrências e prorrogar o prazo total com motivo e histórico. Operações já solicitadas antes dessa alteração preservam as três etapas da política aceita. Não é necessária migração: as colunas anteriores são mantidas para compatibilidade, e novas solicitações guardam `totalDays` na política aceita.
 
 O endpoint já existente `/api/internal/expire-reservations` também executa a manutenção do condicional, protegido por `CRON_SECRET`. É necessário manter o agendamento externo desse endpoint. O botão **Revisar prazos e gerar avisos** permite a mesma manutenção manual. Solicitações e reservas vencidas ainda na loja são canceladas e liberadas. Peças que saíram não são liberadas por expiração.
 
