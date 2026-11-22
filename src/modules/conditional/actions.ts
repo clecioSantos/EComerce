@@ -73,6 +73,7 @@ export async function conditionalAction(input: unknown) {
       case "profile":
         await conditional.saveProfile(actor, {
           ...v,
+          useStoreLimits: v.useStoreLimits === "on",
           eligibleUntil: v.eligibleUntil ? `${v.eligibleUntil}T23:59:59-03:00` : null,
         });
         break;
