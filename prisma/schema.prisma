@@ -304,7 +304,7 @@ model ProductAttributeAssignment {
 }
 
 model Product {
-  conditionalEligible Boolean @default(false)
+  conditionalEligible Boolean @default(true)
   storeId          String        @default("legacy-store")
   store            Store         @relation(fields: [storeId], references: [id])
   id               String        @id @default(cuid())
@@ -968,6 +968,7 @@ model ConditionalCustomerProfile {
   store         Store     @relation(fields: [storeId], references: [id], onDelete: Restrict)
   user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   eligibility   String    @default("NOT_REVIEWED")
+  useStoreLimits Boolean  @default(true)
   maxOpenAmount Decimal   @default(0) @db.Decimal(12, 2)
   maxOpenUnits  Int       @default(0)
   maxCaseAmount Decimal   @default(0) @db.Decimal(12, 2)
