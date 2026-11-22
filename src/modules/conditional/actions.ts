@@ -77,12 +77,12 @@ export async function conditionalAction(input: unknown) {
           : null;
         await conditional.saveProfile(actor, {
           ...v,
-          ...(storePolicy ? {
-            maxOpenAmount: Number(storePolicy.maxOpenAmount),
-            maxOpenUnits: storePolicy.maxOpenUnits,
-            maxCaseAmount: Number(storePolicy.maxCaseAmount),
-            maxCaseUnits: storePolicy.maxCaseUnits,
-            maxOpenCases: storePolicy.maxOpenCases,
+          ...(useStoreLimits ? {
+            maxOpenAmount: Number(storePolicy?.maxOpenAmount ?? 0),
+            maxOpenUnits: storePolicy?.maxOpenUnits ?? 0,
+            maxCaseAmount: Number(storePolicy?.maxCaseAmount ?? 0),
+            maxCaseUnits: storePolicy?.maxCaseUnits ?? 0,
+            maxOpenCases: storePolicy?.maxOpenCases ?? 0,
           } : {}),
           useStoreLimits,
           eligibleUntil: v.eligibleUntil ? `${v.eligibleUntil}T23:59:59-03:00` : null,
