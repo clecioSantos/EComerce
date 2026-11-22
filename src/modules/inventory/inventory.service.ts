@@ -247,3 +247,75 @@ export async function restockStock(
 }
 
 export { InventoryError };
+
+/** Atualiza campos administrativos de estoque em uma operação atômica e auditável. */
+export async function updateInventoryValues(input: {
+  variantId: string;
+  quantityOnHand: number;
+  quantityReserved: number;
+  quantityOnConditional: number;
+  quantityQuarantined: number;
+  reorderLevel: number;
+  allowBackorder: boolean;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const previous = await tx.inventory.findUnique({ where: { variantId: input.variantId } });
+    if (!previous) throw new InventoryError("Estoque não encontrado para a variante.");
+    if (!input.allowBackorder &&
+        input.quantityOnHand < input.quantityReserved + input.quantityQuarantined) {
+      throw new InventoryError("Estoque físico insuficiente para as reservas e a conferência.");
+    }
+
+    // Compare-and-swap: um pedido simultâneo não deve ser sobrescrito pelo formulário.
+    const result = await tx.inventory.updateMany({
+      where: {
+        id: previous.id,
+        quantityOnHand: previous.quantityOnHand,
+        quantityReserved: previous.quantityReserved,
+        quantityOnConditional: previous.quantityOnConditional,
+        quantityQuarantined: previous.quantityQuarantined,
+        reorderLevel: previous.reorderLevel,
+        allowBackorder: previous.allowBackorder,
+      },
+      data: {
+        quantityOnHand: input.quantityOnHand,
+        quantityReserved: input.quantityReserved,
+        quantityOnConditional: input.quantityOnConditional,
+        quantityQuarantined: input.quantityQuarantined,
+        reorderLevel: input.reorderLevel,
+        allowBackorder: input.allowBackorder,
+      },
+    });
+    if (result.count !== 1) {
+      throw new InventoryError("O estoque foi alterado por outra operação. Atualize a página e tente novamente.");
+    }
+    const before = {
+      quantityOnHand: previous.quantityOnHand,
+      quantityReserved: previous.quantityReserved,
+      quantityOnConditional: previous.quantityOnConditional,
+      quantityQuarantined: previous.quantityQuarantined,
+      reorderLevel: previous.reorderLevel,
+      allowBackorder: previous.allowBackorder,
+    };
+    const after = {
+      quantityOnHand: input.quantityOnHand,
+      quantityReserved: input.quantityReserved,
+      quantityOnConditional: input.quantityOnConditional,
+      quantityQuarantined: input.quantityQuarantined,
+      reorderLevel: input.reorderLevel,
+      allowBackorder: input.allowBackorder,
+    };
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      await tx.inventoryMovement.create({
+        data: {
+          inventoryId: previous.id,
+          variantId: input.variantId,
+          type: "ADJUSTMENT",
+          quantity: input.quantityOnHand - previous.quantityOnHand,
+          reason: "Edição manual dos valores de estoque (admin)",
+          metadata: { before, after },
+        },
+      });
+    }
+  });
+}
