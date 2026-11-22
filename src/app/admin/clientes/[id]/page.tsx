@@ -73,8 +73,9 @@ export default async function CustomerDetailPage({
       <section className="bg-background space-y-4 rounded border p-5">
         <h2 className="text-xl font-semibold">Elegibilidade e limites individuais</h2>
         <p className="text-muted-foreground text-sm">
-          Os limites efetivos respeitam também os tetos da loja. Valores ausentes ou zero
-          não são ilimitados.
+          Por padrão, a cliente segue os limites configurados na loja. Desmarque a opção
+          abaixo somente quando precisar de valores próprios. Os limites personalizados
+          continuam sujeitos aos tetos da loja.
         </p>
         <ActionForm
           operation="profile"
@@ -96,17 +97,38 @@ export default async function CustomerDetailPage({
               ))}
             </select>
           </label>
-          <LimitFields
-            data={
-              p
-                ? {
-                    ...p,
-                    maxOpenAmount: String(p.maxOpenAmount),
-                    maxCaseAmount: String(p.maxCaseAmount),
-                  }
-                : null
-            }
-          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              className="peer"
+              type="checkbox"
+              name="useStoreLimits"
+              defaultChecked={p?.useStoreLimits ?? true}
+            />
+            Usar os limites padrão da loja (atualizados automaticamente)
+          </label>
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-xs">
+              Para personalizar, desmarque a opção acima. Os valores abaixo ficam
+              disponíveis para edição individual.
+            </p>
+            <LimitFields
+              data={
+                p && !p.useStoreLimits
+                  ? {
+                      ...p,
+                      maxOpenAmount: String(p.maxOpenAmount),
+                      maxCaseAmount: String(p.maxCaseAmount),
+                    }
+                  : summary.policy
+                    ? {
+                        ...summary.policy,
+                        maxOpenAmount: String(summary.policy.maxOpenAmount),
+                        maxCaseAmount: String(summary.policy.maxCaseAmount),
+                      }
+                    : null
+              }
+            />
+          </div>
           <Field
             name="eligibleUntil"
             label="Validade da autorização (opcional)"
