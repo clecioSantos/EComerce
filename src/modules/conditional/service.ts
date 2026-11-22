@@ -18,6 +18,7 @@ import {
   moneySum,
   overdue,
   profileSchema,
+  limitsShape,
   requestSchema,
   selectionSchema,
   settingsSchema,
@@ -172,7 +173,20 @@ export async function saveProfile(actor: Actor, input: unknown) {
       where: { storeId_userId: { storeId: STORE_ID, userId: data.userId } },
     });
     const { reason, ...values } = data;
+    const policy = await tx.conditionalSettings.findUnique({ where: { storeId: STORE_ID } });
+    if (values.eligibility === "ELIGIBLE" && (!policy?.enabled ||
+      Object.keys(limitsShape).some((key) => Number(policy[key as keyof typeof limitsShape]) <= 0))) {
+      throw new Error("Configure e habilite os limites do condicional na loja antes de autorizar clientes.");
+    }
+    const limits = values.useStoreLimits && policy ? {
+      maxOpenAmount: policy.maxOpenAmount,
+      maxOpenUnits: policy.maxOpenUnits,
+      maxCaseAmount: policy.maxCaseAmount,
+      maxCaseUnits: policy.maxCaseUnits,
+      maxOpenCases: policy.maxOpenCases,
+    } : {};
     const fields = {
+      ...limits,
       ...values,
       eligibleUntil: values.eligibleUntil ? new Date(values.eligibleUntil) : null,
       reviewedBy: actor.id,
