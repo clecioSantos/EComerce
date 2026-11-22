@@ -20,7 +20,7 @@ export default async function AdminInventoryPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Estoque</h1>
         <p className="text-muted-foreground text-sm">
-          O estoque pertence à variante. Ajustes são registrados no histórico.
+          Os valores pertencem a cada variante. Clique em Editar estoque para alterar quantidades e limites; as alterações ficam registradas no histórico.
         </p>
       </div>
 
@@ -36,7 +36,7 @@ export default async function AdminInventoryPage() {
               <th className="px-4 py-3 font-medium">Em condicional</th>
               <th className="px-4 py-3 font-medium">Em conferência</th>
               <th className="px-4 py-3 font-medium">Envio</th>
-              <th className="px-4 py-3 font-medium">Ajustar</th>
+              <th className="px-4 py-3 font-medium">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -77,14 +77,24 @@ export default async function AdminInventoryPage() {
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <InventoryAdjust variantId={item.variantId} />
+                    <InventoryAdjust
+                      variantId={item.variantId}
+                      sku={item.variant.sku}
+                      productName={item.variant.product.name}
+                      quantityOnHand={item.quantityOnHand}
+                      quantityReserved={item.quantityReserved}
+                      quantityOnConditional={item.quantityOnConditional}
+                      quantityQuarantined={item.quantityQuarantined}
+                      reorderLevel={item.reorderLevel}
+                      allowBackorder={item.allowBackorder}
+                    />
                   </td>
                 </tr>
               );
             })}
             {items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-muted-foreground px-4 py-8 text-center">
+                <td colSpan={9} className="text-muted-foreground px-4 py-8 text-center">
                   Nenhum item em estoque.
                 </td>
               </tr>
