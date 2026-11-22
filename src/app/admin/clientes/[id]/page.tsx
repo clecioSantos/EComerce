@@ -6,7 +6,8 @@ import { requireAdmin } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db/prisma";
 import { customerSummary } from "@/modules/conditional/service";
 import { STORE_ID, ELIGIBILITY_LABELS } from "@/modules/conditional/rules";
-import { ActionForm, Field, LimitFields } from "@/components/conditional/action-form";
+import { ActionForm, Field } from "@/components/conditional/action-form";
+import { CustomerConditionalLimits } from "@/components/conditional/customer-limits";
 import { CustomerCapacity } from "@/components/conditional/customer-capacity";
 import { formatDateTime } from "@/lib/format";
 export const dynamic = "force-dynamic";
@@ -97,38 +98,23 @@ export default async function CustomerDetailPage({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              className="peer"
-              type="checkbox"
-              name="useStoreLimits"
-              defaultChecked={p?.useStoreLimits ?? true}
-            />
-            Usar os limites padrão da loja (atualizados automaticamente)
-          </label>
-          <div className="space-y-3">
-            <p className="text-muted-foreground text-xs">
-              Para personalizar, desmarque a opção acima. Os valores abaixo ficam
-              disponíveis para edição individual.
-            </p>
-            <LimitFields
-              data={
-                p && !p.useStoreLimits
-                  ? {
-                      ...p,
-                      maxOpenAmount: String(p.maxOpenAmount),
-                      maxCaseAmount: String(p.maxCaseAmount),
-                    }
-                  : summary.policy
-                    ? {
-                        ...summary.policy,
-                        maxOpenAmount: String(summary.policy.maxOpenAmount),
-                        maxCaseAmount: String(summary.policy.maxCaseAmount),
-                      }
-                    : null
-              }
-            />
-          </div>
+          <CustomerConditionalLimits
+            useStoreLimits={p?.useStoreLimits ?? true}
+            profile={p ? {
+              maxOpenAmount: Number(p.maxOpenAmount),
+              maxOpenUnits: p.maxOpenUnits,
+              maxCaseAmount: Number(p.maxCaseAmount),
+              maxCaseUnits: p.maxCaseUnits,
+              maxOpenCases: p.maxOpenCases,
+            } : null}
+            policy={summary.policy ? {
+              maxOpenAmount: Number(summary.policy.maxOpenAmount),
+              maxOpenUnits: summary.policy.maxOpenUnits,
+              maxCaseAmount: Number(summary.policy.maxCaseAmount),
+              maxCaseUnits: summary.policy.maxCaseUnits,
+              maxOpenCases: summary.policy.maxOpenCases,
+            } : null}
+          />
           <Field
             name="eligibleUntil"
             label="Validade da autorização (opcional)"
