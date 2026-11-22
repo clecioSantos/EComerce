@@ -56,6 +56,7 @@ export const profileSchema = z
   .object({
     ...limitsShape,
     userId: z.string().min(1),
+    useStoreLimits: z.boolean().default(true),
     eligibility: z.enum(["NOT_REVIEWED", "ELIGIBLE", "SUSPENDED", "INELIGIBLE"]),
     eligibleUntil: z.string().nullable(),
     notes: z.string().max(2000),
@@ -63,7 +64,7 @@ export const profileSchema = z
   })
   .superRefine((x, ctx) => {
     if (
-      x.eligibility === "ELIGIBLE" &&
+      x.eligibility === "ELIGIBLE" && !x.useStoreLimits &&
       Object.keys(limitsShape).some((k) => Number(x[k as keyof typeof x]) <= 0)
     )
       ctx.addIssue({
@@ -113,7 +114,14 @@ export type Limits = {
   maxOpenCases: number;
 };
 export type Usage = { amount: number; units: number; cases: number; blocked: boolean };
-export function effectiveLimits(store: Limits, profile: Limits) {
+export function effectiveLimits(store: Limits, profile: Limits & { useStoreLimits?: boolean }) {
+  if (profile.useStoreLimits) return {
+    maxOpenAmount: Number(store.maxOpenAmount),
+    maxOpenUnits: store.maxOpenUnits,
+    maxCaseAmount: Number(store.maxCaseAmount),
+    maxCaseUnits: store.maxCaseUnits,
+    maxOpenCases: store.maxOpenCases,
+  };
   return {
     maxOpenAmount: Math.min(Number(store.maxOpenAmount), Number(profile.maxOpenAmount)),
     maxOpenUnits: Math.min(store.maxOpenUnits, profile.maxOpenUnits),
