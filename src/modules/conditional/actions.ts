@@ -70,13 +70,25 @@ export async function conditionalAction(input: unknown) {
           customerPaysShipping: v.customerPaysShipping === "on",
         });
         break;
-      case "profile":
+      case "profile": {
+        const useStoreLimits = v.useStoreLimits === "on";
+        const storePolicy = useStoreLimits
+          ? await prisma.conditionalSettings.findUnique({ where: { storeId: "legacy-store" } })
+          : null;
         await conditional.saveProfile(actor, {
           ...v,
-          useStoreLimits: v.useStoreLimits === "on",
+          ...(storePolicy ? {
+            maxOpenAmount: Number(storePolicy.maxOpenAmount),
+            maxOpenUnits: storePolicy.maxOpenUnits,
+            maxCaseAmount: Number(storePolicy.maxCaseAmount),
+            maxCaseUnits: storePolicy.maxCaseUnits,
+            maxOpenCases: storePolicy.maxOpenCases,
+          } : {}),
+          useStoreLimits,
           eligibleUntil: v.eligibleUntil ? `${v.eligibleUntil}T23:59:59-03:00` : null,
         });
         break;
+      }
       case "product":
         await conditional.setProductEligibility(
           actor,
