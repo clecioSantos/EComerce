@@ -63,6 +63,7 @@ export function ProductForm({
   const [basePrice, setBasePrice] = useState("");
   const [compareAtPrice, setCompareAtPrice] = useState("");
   const [status, setStatus] = useState("ACTIVE");
+  const [conditionalEligible, setConditionalEligible] = useState(true);
   const [categoryId, setCategoryId] = useState<string>("none");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -182,6 +183,7 @@ export function ProductForm({
         compareAtPrice: parseDecimalInput(compareAtPrice),
         currency: "BRL",
         isFeatured: false,
+        conditionalEligible,
         metadata: null,
         images: [
           { url: image, alt: name, position: 0, isPrimary: true, variantSku: null },
@@ -560,6 +562,10 @@ export function ProductForm({
         >
           Cancelar
         </Button>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={conditionalEligible} onChange={(event) => setConditionalEligible(event.target.checked)} />
+          Disponível para venda condicional
+        </label>
         <Button type="button" onClick={handleSubmit} disabled={pending}>
           {pending ? "Salvando..." : "Criar produto"}
         </Button>
