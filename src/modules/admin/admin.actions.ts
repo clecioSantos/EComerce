@@ -13,7 +13,7 @@ import {
   createCategory,
   createCategorySchema,
 } from "@/modules/categories/category.service";
-import { applyInventoryMovement } from "@/modules/inventory/inventory.service";
+import { applyInventoryMovement, updateInventoryValues } from "@/modules/inventory/inventory.service";
 import { updateOrderStatus } from "@/modules/orders/order.service";
 import { refundOrder } from "@/modules/payments/payment.service";
 import {
@@ -308,6 +308,34 @@ export async function adjustInventoryAction(input: {
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Erro ao ajustar estoque.",
+    };
+  }
+}
+
+
+const inventoryValuesSchema = z.object({
+  variantId: z.string().min(1),
+  quantityOnHand: z.number().int().nonnegative(),
+  quantityReserved: z.number().int().nonnegative(),
+  quantityOnConditional: z.number().int().nonnegative(),
+  quantityQuarantined: z.number().int().nonnegative(),
+  reorderLevel: z.number().int().nonnegative(),
+  allowBackorder: z.boolean(),
+});
+
+export async function updateInventoryValuesAction(input: unknown): Promise<AdminActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const parsed = inventoryValuesSchema.parse(input);
+    await updateInventoryValues(parsed);
+    revalidatePath("/admin/estoque");
+    revalidatePath("/produtos");
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Erro ao salvar o estoque.",
     };
   }
 }
