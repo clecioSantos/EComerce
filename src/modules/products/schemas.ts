@@ -155,6 +155,7 @@ export const updateProductSchema = z
     basePrice: z.coerce.number().min(0),
     compareAtPrice: z.coerce.number().min(0).optional().nullable(),
     isFeatured: z.coerce.boolean().default(false),
+    conditionalEligible: z.boolean().default(true),
     primaryImageUrl: z
       .union([z.url(), z.literal("")])
       .optional()
@@ -185,6 +186,7 @@ export const createProductSchema = z
     compareAtPrice: z.coerce.number().min(0).optional().nullable(),
     currency: z.string().length(3).default("BRL"),
     isFeatured: z.coerce.boolean().default(false),
+    conditionalEligible: z.boolean().default(true),
     metadata: z.record(z.string(), z.unknown()).optional().nullable(),
     images: z.array(productImageSchema).default([]),
     assignments: z.array(productAssignmentSchema).default([]),
