@@ -294,6 +294,7 @@ export async function createProduct(input: CreateProductInput) {
       compareAtPrice: input.compareAtPrice ?? null,
       currency: input.currency,
       isFeatured: input.isFeatured,
+      conditionalEligible: input.conditionalEligible,
       metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
       images: {
         create: input.images.map((image) => ({
@@ -373,6 +374,7 @@ export interface AdminProductEditDTO {
   basePrice: number;
   compareAtPrice: number | null;
   isFeatured: boolean;
+  conditionalEligible: boolean;
   primaryImageUrl: string | null;
   variants: AdminProductEditVariant[];
 }
@@ -404,6 +406,7 @@ export async function getProductForEdit(id: string): Promise<AdminProductEditDTO
     compareAtPrice:
       product.compareAtPrice == null ? null : toNumber(product.compareAtPrice),
     isFeatured: product.isFeatured,
+    conditionalEligible: product.conditionalEligible,
     primaryImageUrl: primary?.url ?? null,
     variants: product.variants.map((variant) => ({
       id: variant.id,
@@ -448,6 +451,7 @@ export async function updateProduct(input: UpdateProductInput) {
         basePrice: input.basePrice,
         compareAtPrice: input.compareAtPrice ?? null,
         isFeatured: input.isFeatured,
+        conditionalEligible: input.conditionalEligible,
       },
     });
 
