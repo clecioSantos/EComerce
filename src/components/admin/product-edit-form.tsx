@@ -80,6 +80,7 @@ export function ProductEditForm({
     basePrice: toValue(product.basePrice),
     compareAtPrice: toValue(product.compareAtPrice),
     isFeatured: product.isFeatured,
+    conditionalEligible: product.conditionalEligible,
     imageUrl: product.primaryImageUrl ?? "",
     description: product.description ?? "",
     shortDescription: product.shortDescription ?? "",
@@ -118,6 +119,7 @@ export function ProductEditForm({
         basePrice: Number(form.basePrice) || 0,
         compareAtPrice: parseDecimalInput(form.compareAtPrice),
         isFeatured: form.isFeatured,
+        conditionalEligible: form.conditionalEligible,
         primaryImageUrl: form.imageUrl.trim(),
         variants: variants.map((variant) => ({
           id: variant.id,
@@ -232,6 +234,10 @@ export function ProductEditForm({
               onCheckedChange={(value) => update({ isFeatured: value === true })}
             />
             <Label htmlFor="isFeatured">Produto em destaque</Label>
+          </div>
+          <div className="flex items-center gap-2 pt-6">
+            <Checkbox id="conditionalEligible" checked={form.conditionalEligible} onCheckedChange={(value) => update({ conditionalEligible: value === true })} />
+            <Label htmlFor="conditionalEligible">Disponível para venda condicional</Label>
           </div>
 
           <div className="space-y-2 sm:col-span-2">
